@@ -1,4 +1,4 @@
-// eslint-disable-next-line eslint-comments/disable-enable-pair
+// eslint-disable-next-line @eslint-community/eslint-comments/disable-enable-pair
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import ChildProcess from 'child_process';
 import pathModule from 'path';
@@ -6,12 +6,13 @@ import pathModule from 'path';
 import React, {PureComponent} from 'react';
 import type {ComponentType} from 'react';
 
-import {require as remoteRequire} from '@electron/remote';
-// TODO: Should be updates to new async API https://medium.com/@nornagon/electrons-remote-module-considered-harmful-70d69500f31
 import ReactDOM from 'react-dom';
 import {connect as reduxConnect} from 'react-redux';
-import type {ConnectOptions} from 'react-redux/es/components/connect';
 import type {Dispatch, Middleware} from 'redux';
+
+interface ConnectOptions {
+  forwardRef?: boolean;
+}
 
 import type {
   hyperPlugin,
@@ -29,12 +30,10 @@ import type {
 } from '../../typings/hyper';
 import Notification from '../components/notification';
 
+import {ipcRenderer} from './ipc';
 import IPCChildProcess from './ipc-child-process';
 import notify from './notify';
 import {ObjectTypedKeys} from './object';
-
-// remote interface to `../plugins`
-const plugins = remoteRequire('./plugins') as typeof import('../../app/plugins');
 
 // `require`d modules
 let modules: hyperPlugin[];
@@ -80,7 +79,6 @@ function exposeDecorated<P extends Record<string, any>>(
     onRef = (decorated_: any) => {
       if (this.props.onDecorated) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           this.props.onDecorated(decorated_);
         } catch (e) {
           notify('Plugin error', `Error occurred. Check Developer Tools for details`, {error: e});
@@ -168,7 +166,7 @@ export function decorate<P extends Record<string, any>>(
 // patching Module._load
 // so plugins can `require` them without needing their own version
 // https://github.com/vercel/hyper/issues/619
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const Module = require('module') as typeof import('module') & {_load: Function};
 const originalLoad = Module._load;
 Module._load = function _load(path: string) {
@@ -200,14 +198,13 @@ Module._load = function _load(path: string) {
   }
 };
 
-const clearModulesCache = () => {
+const clearModulesCache = async () => {
   // the fs locations where user plugins are stored
-  const {path, localPath} = plugins.getBasePaths();
+  const {path, localPath} = await ipcRenderer.invoke('getBasePaths');
 
   // trigger unload hooks
   modules.forEach((mod) => {
     if (mod.onRendererUnload) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       mod.onRendererUnload(window);
     }
   });
@@ -233,9 +230,9 @@ const getPluginVersion = (path: string): string | null => {
   return version;
 };
 
-const loadModules = () => {
+const loadModules = async () => {
   console.log('(re)loading renderer plugins');
-  const paths = plugins.getPaths();
+  const paths = await ipcRenderer.invoke('getPaths');
 
   // initialize cache that we populate with extension methods
   connectors = {
@@ -266,7 +263,8 @@ const loadModules = () => {
     reduceTermGroups: termGroupsReducers
   };
 
-  const loadedPlugins = plugins.getLoadedPluginVersions().map((plugin: any) => plugin.name);
+  const loadedPluginVersions = await ipcRenderer.invoke('getLoadedPluginVersions');
+  const loadedPlugins = loadedPluginVersions.map((plugin: any) => plugin.name);
   modules = paths.plugins
     .concat(paths.localPlugins)
     .filter((plugin) => loadedPlugins.indexOf(pathModule.basename(plugin)) !== -1)
@@ -372,7 +370,6 @@ const loadModules = () => {
       }
 
       if (mod.onRendererWindow) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         mod.onRendererWindow(window);
       }
       console.log(`Plugin ${pluginName} (${pluginVersion}) loaded.`);
@@ -381,7 +378,7 @@ const loadModules = () => {
     })
     .filter((mod): mod is hyperPlugin => Boolean(mod));
 
-  const deprecatedPlugins = plugins.getDeprecatedConfig();
+  const deprecatedPlugins = await ipcRenderer.invoke('getDeprecatedConfig');
   Object.keys(deprecatedPlugins).forEach((name) => {
     const {css} = deprecatedPlugins[name];
     if (css.length > 0) {
@@ -390,12 +387,14 @@ const loadModules = () => {
   });
 };
 
-// load modules for initial decoration
-loadModules();
+// init must be called before using the plugin system
+export async function init() {
+  await loadModules();
+}
 
-export function reload() {
-  clearModulesCache();
-  loadModules();
+export async function reload() {
+  await clearModulesCache();
+  await loadModules();
   // trigger re-decoration when components
   // get re-rendered
   decorated = {};
@@ -413,7 +412,6 @@ function getProps(name: keyof typeof propsDecorators, props: any, ...fnArgs: any
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       ret_ = fn(...fnArgs, props_);
     } catch (err) {
       notify('Plugin error', `${fn._pluginName}: Error occurred in \`${name}\`. Check Developer Tools for details.`, {
@@ -473,7 +471,6 @@ export function connect<stateProps extends {}, dispatchProps>(
           let ret_;
 
           try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             ret_ = fn(state, ret);
           } catch (err) {
             notify(
@@ -499,7 +496,6 @@ export function connect<stateProps extends {}, dispatchProps>(
           let ret_;
 
           try {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
             ret_ = fn(dispatch, ret);
           } catch (err) {
             notify(
@@ -535,14 +531,12 @@ const decorateReducer: {
 } = <T extends keyof typeof reducersDecorators>(name: T, fn: any) => {
   const reducers = reducersDecorators[name];
   return (state: any, action: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     let state_ = fn(state, action);
 
     reducers.forEach((pluginReducer: any) => {
       let state__;
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         state__ = pluginReducer(state_, action);
       } catch (err) {
         notify('Plugin error', `${fn._pluginName}: Error occurred in \`${name}\`. Check Developer Tools for details.`, {

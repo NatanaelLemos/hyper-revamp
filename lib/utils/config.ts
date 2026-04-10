@@ -1,21 +1,26 @@
-import {require as remoteRequire, getCurrentWindow} from '@electron/remote';
-// TODO: Should be updates to new async API https://medium.com/@nornagon/electrons-remote-module-considered-harmful-70d69500f31
-
 import {ipcRenderer} from './ipc';
 
-const plugins = remoteRequire('./plugins') as typeof import('../../app/plugins');
+let _profileName: string = '';
+
+export async function init() {
+  _profileName = await ipcRenderer.invoke('getProfileName');
+}
+
+export function getProfileName() {
+  return _profileName;
+}
 
 Object.defineProperty(window, 'profileName', {
   get() {
-    return getCurrentWindow().profileName;
+    return _profileName;
   },
   set() {
     throw new Error('profileName is readonly');
   }
 });
 
-export function getConfig() {
-  return plugins.getDecoratedConfig(window.profileName);
+export async function getConfig() {
+  return ipcRenderer.invoke('getDecoratedConfig', _profileName);
 }
 
 export function subscribe(fn: (event: Electron.IpcRendererEvent, ...args: any[]) => void) {

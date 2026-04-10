@@ -1,13 +1,13 @@
-/* eslint-disable eslint-comments/disable-enable-pair */
+/* eslint-disable @eslint-community/eslint-comments/disable-enable-pair */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 import {exec, execFile} from 'child_process';
 import {writeFileSync} from 'fs';
 import {resolve, basename} from 'path';
 import {promisify} from 'util';
 
-import {app, dialog, ipcMain as _ipcMain} from 'electron';
-import type {BrowserWindow, App, MenuItemConstructorOptions} from 'electron';
+import {app, dialog, ipcMain as _ipcMain, shell, BrowserWindow} from 'electron';
+import type {App, MenuItemConstructorOptions} from 'electron';
 import React from 'react';
 
 import Config from 'electron-store';
@@ -62,7 +62,6 @@ config.subscribe(() => {
 // so plugins can `require` them without needing their own version
 // https://github.com/vercel/hyper/issues/619
 function patchModuleLoad() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const Module = require('module');
   const originalLoad = Module._load;
   Module._load = function _load(modulePath: string) {
@@ -155,7 +154,6 @@ function getPluginVersions() {
   return paths_.map((path_) => {
     let version: string | null = null;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       version = require(resolve(path_, 'package.json')).version;
       //eslint-disable-next-line no-empty
     } catch (err) {}
@@ -200,7 +198,10 @@ if (cache.get('hyper.plugins') !== id || process.env.HYPER_FORCE_UPDATE) {
   const baseConfig = config.getConfig();
   if (baseConfig['autoUpdatePlugins']) {
     // otherwise update plugins every 5 hours
-    setInterval(updatePlugins, ms(baseConfig['autoUpdatePlugins'] === true ? '5h' : baseConfig['autoUpdatePlugins']));
+    setInterval(
+      updatePlugins,
+      ms((baseConfig['autoUpdatePlugins'] === true ? '5h' : baseConfig['autoUpdatePlugins']) as ms.StringValue)
+    );
   }
 })();
 
@@ -294,7 +295,6 @@ function requirePlugins(): any[] {
       // populate the name for internal errors here
       mod._name = basename(path_);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         mod._version = require(resolve(path_, 'package.json')).version;
       } catch (err) {
         console.warn(`No package.json found in ${path_}`);
@@ -465,11 +465,22 @@ export {toDependencies as _toDependencies};
 const ipcMain = _ipcMain as IpcMainWithCommands;
 
 ipcMain.handle('child_process.exec', (event, command, options) => {
-  return promisify(exec)(command, options);
+  // Restrict options to prevent shell injection via cwd or env manipulation
+  const safeOptions = {
+    ...options,
+    timeout: options?.timeout ?? 30000,
+    maxBuffer: options?.maxBuffer ?? 1024 * 1024
+  };
+  return promisify(exec)(command, safeOptions);
 });
 
 ipcMain.handle('child_process.execFile', (event, file, args, options) => {
-  return promisify(execFile)(file, args, options);
+  const safeOptions = {
+    ...options,
+    timeout: options?.timeout ?? 30000,
+    maxBuffer: options?.maxBuffer ?? 1024 * 1024
+  };
+  return promisify(execFile)(file, args, safeOptions);
 });
 
 ipcMain.handle('getLoadedPluginVersions', () => getLoadedPluginVersions());
@@ -478,3 +489,16 @@ ipcMain.handle('getBasePaths', () => getBasePaths());
 ipcMain.handle('getDeprecatedConfig', () => getDeprecatedConfig());
 ipcMain.handle('getDecoratedConfig', (e, profile) => getDecoratedConfig(profile));
 ipcMain.handle('getDecoratedKeymaps', () => getDecoratedKeymaps());
+
+ipcMain.handle('getProfileName', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return win?.profileName || '';
+});
+
+ipcMain.handle('shell:openExternal', (event, url) => {
+  // Only allow http/https URLs to prevent file:// or custom protocol abuse
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+    return shell.openExternal(url);
+  }
+  console.warn(`Blocked shell:openExternal for non-http URL: ${url}`);
+});

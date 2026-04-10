@@ -27,14 +27,7 @@ if (process.platform === 'linux') {
   webFrame.setZoomFactor(1.2);
 }
 
-const store_ = configureStore();
-
-Object.defineProperty(window, 'store', {get: () => store_});
-Object.defineProperty(window, 'rpc', {get: () => rpc});
-Object.defineProperty(window, 'config', {get: () => config});
-Object.defineProperty(window, 'plugins', {get: () => plugins});
-
-const fetchFileData = (configData: configOptions) => {
+const fetchFileData = (configData: configOptions, store_: ReturnType<typeof configureStore>) => {
   const configInfo: configOptions = {...configData, bellSound: null};
   if (!configInfo.bell || configInfo.bell.toUpperCase() !== 'SOUND' || !configInfo.bellSoundURL) {
     store_.dispatch(reloadConfig(configInfo));
@@ -49,198 +42,221 @@ const fetchFileData = (configData: configOptions) => {
   });
 };
 
-// initialize config
-store_.dispatch(loadConfig(config.getConfig()));
-fetchFileData(config.getConfig());
+async function bootstrap() {
+  // Initialize config (fetches profileName via IPC)
+  await config.init();
 
-config.subscribe(() => {
-  const configInfo = config.getConfig();
-  configInfo.bellSound = store_.getState().ui.bellSound;
-  // The only async part of the config is the bellSound so we will check if the bellSoundURL
-  // has changed to determine if we should re-read this file and dispatch an update to the config
-  if (store_.getState().ui.bellSoundURL !== config.getConfig().bellSoundURL) {
-    fetchFileData(configInfo);
-  } else {
-    // No change in the bellSoundURL so continue with a normal reloadConfig, reusing the value
-    // we already have for `bellSound`
-    store_.dispatch(reloadConfig(configInfo));
-  }
-});
+  // Initialize plugins (loads modules via IPC)
+  await plugins.init();
 
-// initialize communication with main electron process
-// and subscribe to all user intents for example from menus
-rpc.on('ready', () => {
-  store_.dispatch(init());
-  store_.dispatch(uiActions.setFontSmoothing());
-});
+  const store_ = configureStore();
 
-rpc.on('session add', (data) => {
-  store_.dispatch(sessionActions.addSession(data));
-});
+  Object.defineProperty(window, 'store', {get: () => store_});
+  Object.defineProperty(window, 'rpc', {get: () => rpc});
+  Object.defineProperty(window, 'config', {get: () => config});
+  Object.defineProperty(window, 'plugins', {get: () => plugins});
 
-rpc.on('session data', (d: string) => {
-  // the uid is a uuid v4 so it's 36 chars long
-  const uid = d.slice(0, 36);
-  const data = d.slice(36);
-  store_.dispatch(sessionActions.addSessionData(uid, data));
-});
+  // initialize config
+  const cfg = await config.getConfig();
+  store_.dispatch(loadConfig(cfg));
+  fetchFileData(cfg, store_);
 
-rpc.on('session data send', ({uid, data, escaped}) => {
-  store_.dispatch(sessionActions.sendSessionData(uid, data, escaped));
-});
+  config.subscribe(() => {
+    void (async () => {
+      const configInfo = await config.getConfig();
+      configInfo.bellSound = store_.getState().ui.bellSound;
+      // The only async part of the config is the bellSound so we will check if the bellSoundURL
+      // has changed to determine if we should re-read this file and dispatch an update to the config
+      const currentConfig = await config.getConfig();
+      if (store_.getState().ui.bellSoundURL !== currentConfig.bellSoundURL) {
+        fetchFileData(configInfo, store_);
+      } else {
+        // No change in the bellSoundURL so continue with a normal reloadConfig, reusing the value
+        // we already have for `bellSound`
+        store_.dispatch(reloadConfig(configInfo));
+      }
+    })();
+  });
 
-rpc.on('session exit', ({uid}) => {
-  store_.dispatch(termGroupActions.ptyExitTermGroup(uid));
-});
+  // initialize communication with main electron process
+  // and subscribe to all user intents for example from menus
+  rpc.on('ready', () => {
+    store_.dispatch(init());
+    store_.dispatch(uiActions.setFontSmoothing());
+  });
 
-rpc.on('termgroup close req', () => {
-  store_.dispatch(termGroupActions.exitActiveTermGroup());
-});
+  rpc.on('session add', (data) => {
+    store_.dispatch(sessionActions.addSession(data));
+  });
 
-rpc.on('session clear req', () => {
-  store_.dispatch(sessionActions.clearActiveSession());
-});
+  rpc.on('session data', (d: string) => {
+    // the uid is a uuid v4 so it's 36 chars long
+    const uid = d.slice(0, 36);
+    const data = d.slice(36);
+    store_.dispatch(sessionActions.addSessionData(uid, data));
+  });
 
-rpc.on('session move word left req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1bb'));
-});
+  rpc.on('session data send', ({uid, data, escaped}) => {
+    store_.dispatch(sessionActions.sendSessionData(uid, data, escaped));
+  });
 
-rpc.on('session move word right req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1bf'));
-});
+  rpc.on('session exit', ({uid}) => {
+    store_.dispatch(termGroupActions.ptyExitTermGroup(uid));
+  });
 
-rpc.on('session move line beginning req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1bOH'));
-});
+  rpc.on('termgroup close req', () => {
+    store_.dispatch(termGroupActions.exitActiveTermGroup());
+  });
 
-rpc.on('session move line end req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1bOF'));
-});
+  rpc.on('session clear req', () => {
+    store_.dispatch(sessionActions.clearActiveSession());
+  });
 
-rpc.on('session del word left req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1b\x7f'));
-});
+  rpc.on('session move word left req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1bb'));
+  });
 
-rpc.on('session del word right req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1bd'));
-});
+  rpc.on('session move word right req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1bf'));
+  });
 
-rpc.on('session del line beginning req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1bw'));
-});
+  rpc.on('session move line beginning req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1bOH'));
+  });
 
-rpc.on('session del line end req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x10B'));
-});
+  rpc.on('session move line end req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1bOF'));
+  });
 
-rpc.on('session break req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x03'));
-});
+  rpc.on('session del word left req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1b\x7f'));
+  });
 
-rpc.on('session stop req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1a'));
-});
+  rpc.on('session del word right req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1bd'));
+  });
 
-rpc.on('session quit req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x1c'));
-});
+  rpc.on('session del line beginning req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1bw'));
+  });
 
-rpc.on('session tmux req', () => {
-  store_.dispatch(sessionActions.sendSessionData(null, '\x02'));
-});
+  rpc.on('session del line end req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x10B'));
+  });
 
-rpc.on('session search', () => {
-  store_.dispatch(sessionActions.openSearch());
-});
+  rpc.on('session break req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x03'));
+  });
 
-rpc.on('session search close', () => {
-  store_.dispatch(sessionActions.closeSearch());
-});
+  rpc.on('session stop req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1a'));
+  });
 
-rpc.on('termgroup add req', ({activeUid, profile}) => {
-  store_.dispatch(termGroupActions.requestTermGroup(activeUid, profile));
-});
+  rpc.on('session quit req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x1c'));
+  });
 
-rpc.on('split request horizontal', ({activeUid, profile}) => {
-  store_.dispatch(termGroupActions.requestHorizontalSplit(activeUid, profile));
-});
+  rpc.on('session tmux req', () => {
+    store_.dispatch(sessionActions.sendSessionData(null, '\x02'));
+  });
 
-rpc.on('split request vertical', ({activeUid, profile}) => {
-  store_.dispatch(termGroupActions.requestVerticalSplit(activeUid, profile));
-});
+  rpc.on('session search', () => {
+    store_.dispatch(sessionActions.openSearch());
+  });
 
-rpc.on('reset fontSize req', () => {
-  store_.dispatch(uiActions.resetFontSize());
-});
+  rpc.on('session search close', () => {
+    store_.dispatch(sessionActions.closeSearch());
+  });
 
-rpc.on('increase fontSize req', () => {
-  store_.dispatch(uiActions.increaseFontSize());
-});
+  rpc.on('termgroup add req', ({activeUid, profile}) => {
+    store_.dispatch(termGroupActions.requestTermGroup(activeUid, profile));
+  });
 
-rpc.on('decrease fontSize req', () => {
-  store_.dispatch(uiActions.decreaseFontSize());
-});
+  rpc.on('split request horizontal', ({activeUid, profile}) => {
+    store_.dispatch(termGroupActions.requestHorizontalSplit(activeUid, profile));
+  });
 
-rpc.on('move left req', () => {
-  store_.dispatch(uiActions.moveLeft());
-});
+  rpc.on('split request vertical', ({activeUid, profile}) => {
+    store_.dispatch(termGroupActions.requestVerticalSplit(activeUid, profile));
+  });
 
-rpc.on('move right req', () => {
-  store_.dispatch(uiActions.moveRight());
-});
+  rpc.on('reset fontSize req', () => {
+    store_.dispatch(uiActions.resetFontSize());
+  });
 
-rpc.on('move jump req', (index) => {
-  store_.dispatch(uiActions.moveTo(index));
-});
+  rpc.on('increase fontSize req', () => {
+    store_.dispatch(uiActions.increaseFontSize());
+  });
 
-rpc.on('next pane req', () => {
-  store_.dispatch(uiActions.moveToNextPane());
-});
+  rpc.on('decrease fontSize req', () => {
+    store_.dispatch(uiActions.decreaseFontSize());
+  });
 
-rpc.on('prev pane req', () => {
-  store_.dispatch(uiActions.moveToPreviousPane());
-});
+  rpc.on('move left req', () => {
+    store_.dispatch(uiActions.moveLeft());
+  });
 
-rpc.on('open file', ({path}) => {
-  store_.dispatch(uiActions.openFile(path));
-});
+  rpc.on('move right req', () => {
+    store_.dispatch(uiActions.moveRight());
+  });
 
-rpc.on('open ssh', (parsedUrl) => {
-  store_.dispatch(uiActions.openSSH(parsedUrl));
-});
+  rpc.on('move jump req', (index) => {
+    store_.dispatch(uiActions.moveTo(index));
+  });
 
-rpc.on('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
-  store_.dispatch(updaterActions.updateAvailable(releaseName, releaseNotes, releaseUrl, canInstall));
-});
+  rpc.on('next pane req', () => {
+    store_.dispatch(uiActions.moveToNextPane());
+  });
 
-rpc.on('move', (window) => {
-  store_.dispatch(uiActions.windowMove(window));
-});
+  rpc.on('prev pane req', () => {
+    store_.dispatch(uiActions.moveToPreviousPane());
+  });
 
-rpc.on('windowGeometry change', (data) => {
-  store_.dispatch(uiActions.windowGeometryUpdated(data));
-});
+  rpc.on('open file', ({path}) => {
+    store_.dispatch(uiActions.openFile(path));
+  });
 
-rpc.on('add notification', ({text, url, dismissable}) => {
-  store_.dispatch(addNotificationMessage(text, url, dismissable));
-});
+  rpc.on('open ssh', (parsedUrl) => {
+    store_.dispatch(uiActions.openSSH(parsedUrl));
+  });
 
-rpc.on('enter full screen', () => {
-  store_.dispatch(uiActions.enterFullScreen());
-});
+  rpc.on('update available', ({releaseName, releaseNotes, releaseUrl, canInstall}) => {
+    store_.dispatch(updaterActions.updateAvailable(releaseName, releaseNotes, releaseUrl, canInstall));
+  });
 
-rpc.on('leave full screen', () => {
-  store_.dispatch(uiActions.leaveFullScreen());
-});
+  rpc.on('move', (window) => {
+    store_.dispatch(uiActions.windowMove(window));
+  });
 
-const root = createRoot(document.getElementById('mount')!);
+  rpc.on('windowGeometry change', (data) => {
+    store_.dispatch(uiActions.windowGeometryUpdated(data));
+  });
 
-root.render(
-  <Provider store={store_}>
-    <HyperContainer />
-  </Provider>
-);
+  rpc.on('add notification', ({text, url, dismissable}) => {
+    store_.dispatch(addNotificationMessage(text, url, dismissable));
+  });
 
-rpc.on('reload', () => {
-  plugins.reload();
+  rpc.on('enter full screen', () => {
+    store_.dispatch(uiActions.enterFullScreen());
+  });
+
+  rpc.on('leave full screen', () => {
+    store_.dispatch(uiActions.leaveFullScreen());
+  });
+
+  const root = createRoot(document.getElementById('mount')!);
+
+  root.render(
+    <Provider store={store_}>
+      <HyperContainer />
+    </Provider>
+  );
+
+  rpc.on('reload', () => {
+    void plugins.reload();
+  });
+}
+
+bootstrap().catch((err) => {
+  console.error('Failed to initialize Hyper:', err);
 });

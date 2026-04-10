@@ -5,7 +5,6 @@ import {URL, fileURLToPath} from 'url';
 import {app, BrowserWindow, shell, Menu} from 'electron';
 import type {BrowserWindowConstructorOptions} from 'electron';
 
-import {enable as remoteEnable} from '@electron/remote/main';
 import isDev from 'electron-is-dev';
 import {getWorkingDirectoryFromPID} from 'native-process-working-directory';
 import {v4 as uuidv4} from 'uuid';
@@ -50,16 +49,18 @@ export function newWindow(
     webPreferences: {
       nodeIntegration: true,
       navigateOnDragDrop: true,
-      contextIsolation: false
+      contextIsolation: false,
+      // nodeIntegration is required for the plugin system which loads arbitrary
+      // npm packages into the renderer. contextIsolation cannot be enabled until
+      // the plugin architecture is migrated to use a preload bridge.
+      // webSecurity is explicitly enabled to prevent file:// and cross-origin attacks.
+      webSecurity: true
     },
     ...options_
   };
   const window = new BrowserWindow(app.plugins.getDecoratedBrowserOptions(winOpts));
 
   window.profileName = profileName;
-
-  // Enable remote module on this window
-  remoteEnable(window.webContents);
 
   window.uid = classOpts.uid;
 
@@ -129,7 +130,7 @@ export function newWindow(
     const profile = extraOptionsFiltered.profile || profileName;
     const activeSession = extraOptionsFiltered.activeUid ? sessions.get(extraOptionsFiltered.activeUid) : undefined;
     let cwd = '';
-    if (cfg.preserveCWD !== false && activeSession && activeSession.profile === profile) {
+    if (cfg.preserveCWD !== false && activeSession?.profile === profile) {
       const activePID = activeSession.pty?.pid;
       if (activePID !== undefined) {
         try {

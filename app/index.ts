@@ -3,18 +3,12 @@ import {cfgPath} from './config/paths';
 
 // Print diagnostic information for a few arguments instead of running Hyper.
 if (['--help', '-v', '--version'].includes(process.argv[1])) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const {version} = require('./package');
   console.log(`Hyper version ${version}`);
   console.log('Hyper does not accept any command line arguments. Please modify the config file instead.');
   console.log(`Hyper configuration file located at: ${cfgPath}`);
   process.exit();
 }
-
-// Enable remote module
-// eslint-disable-next-line import/order
-import {initialize as remoteInitialize} from '@electron/remote/main';
-remoteInitialize();
 
 // set up config
 // eslint-disable-next-line import/order
@@ -186,7 +180,7 @@ app.on('ready', () =>
               }
             }
           ]);
-          app.dock.setMenu(dockMenu);
+          app.dock?.setMenu(dockMenu);
         }
 
         Menu.setApplicationMenu(AppMenu.buildMenu(menu));
