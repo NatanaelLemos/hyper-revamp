@@ -11,10 +11,11 @@ import type {HyperActions, HyperState} from '../../typings/hyper';
  */
 const effectsMiddleware: Middleware<{}, HyperState, Dispatch<HyperActions>> = () => (next) => (action) => {
   const ret = next(action);
-  if (action.effect) {
+  const typedAction = action as HyperActions;
+  if (typedAction.effect) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    action.effect();
-    delete action.effect;
+    typedAction.effect();
+    delete typedAction.effect;
   }
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return ret;

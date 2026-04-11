@@ -1,4 +1,5 @@
 import vm from 'vm';
+import {homedir} from 'os';
 
 import merge from 'lodash/merge';
 
@@ -29,8 +30,57 @@ const _extractDefault = (cfg: string) => {
   return _extract(_syntaxValidation(cfg));
 };
 
+const expandHomePath = (value?: string) => {
+  if (!value) {
+    return value;
+  }
+
+  if (value === '~') {
+    return homedir();
+  }
+
+  if (value.startsWith('~/')) {
+    return `${homedir()}/${value.slice(2)}`;
+  }
+
+  return value;
+};
+
+const normalizeLegacyProfileConfig = (profile?: Record<string, any>) => {
+  if (!profile) {
+    return profile;
+  }
+
+  const hypercwdInitialDirectory = profile.hypercwd?.initialWorkingDirectory;
+  if (!profile.workingDirectory && hypercwdInitialDirectory) {
+    profile.workingDirectory = hypercwdInitialDirectory;
+  }
+
+  if (hypercwdInitialDirectory && profile.preserveCWD === undefined) {
+    profile.preserveCWD = true;
+  }
+
+  profile.workingDirectory = expandHomePath(profile.workingDirectory);
+
+  return profile;
+};
+
+const normalizeLegacyConfig = (cfg?: rawConfig) => {
+  if (!cfg?.config) {
+    return cfg;
+  }
+
+  normalizeLegacyProfileConfig(cfg.config as Record<string, any>);
+  cfg.config.profiles?.forEach((profile) => normalizeLegacyProfileConfig(profile.config as Record<string, any>));
+
+  return cfg;
+};
+
 // init config
 const _init = (userCfg: rawConfig, defaultCfg: rawConfig): parsedConfig => {
+  normalizeLegacyConfig(userCfg);
+  normalizeLegacyConfig(defaultCfg);
+
   return {
     config: (() => {
       if (userCfg?.config) {

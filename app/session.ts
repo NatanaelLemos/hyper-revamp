@@ -1,11 +1,13 @@
 import {EventEmitter} from 'events';
+import {accessSync, chmodSync, constants as fsConstants, existsSync} from 'fs';
 import {dirname} from 'path';
+import path from 'path';
 import {StringDecoder} from 'string_decoder';
 
 import defaultShell from 'default-shell';
 import type {IPty, IWindowsPtyForkOptions, spawn as npSpawn} from 'node-pty';
 import osLocale from 'os-locale';
-import shellEnv from 'shell-env';
+import {shellEnvSync} from 'shell-env';
 
 import * as config from './config';
 import {cliScriptPath} from './config/paths';
@@ -24,6 +26,40 @@ try {
   spawn = require('node-pty').spawn;
 } catch (err) {
   throw createNodePtyError();
+}
+
+function ensureNodePtySpawnHelperExecutable() {
+  if (process.platform === 'win32') {
+    return;
+  }
+
+  let nodePtyRoot: string;
+  try {
+    nodePtyRoot = dirname(require.resolve('node-pty/package.json'));
+  } catch {
+    return;
+  }
+
+  const helperCandidates = [
+    path.join(nodePtyRoot, 'build', 'Release', 'spawn-helper'),
+    path.join(nodePtyRoot, 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper')
+  ];
+
+  for (const helperPath of helperCandidates) {
+    if (!existsSync(helperPath)) {
+      continue;
+    }
+
+    try {
+      accessSync(helperPath, fsConstants.X_OK);
+    } catch {
+      try {
+        chmodSync(helperPath, 0o755);
+      } catch (error) {
+        console.warn(`Failed to update node-pty spawn-helper permissions at ${helperPath}`, error);
+      }
+    }
+  }
 }
 
 const useConpty = config.getConfig().useConpty;
@@ -111,6 +147,7 @@ export default class Session extends EventEmitter {
   }
 
   init({uid, rows, cols, cwd, shell: _shell, shellArgs: _shellArgs, profile}: SessionOptions) {
+    ensureNodePtySpawnHelperExecutable();
     this.profile = profile;
     const envFromConfig = config.getProfileConfig(profile).env || {};
     const defaultShellArgs = ['--login'];
@@ -119,7 +156,7 @@ export default class Session extends EventEmitter {
     const shellArgs = _shellArgs || defaultShellArgs;
 
     const cleanEnv =
-      process.env['APPIMAGE'] && process.env['APPDIR'] ? shellEnv.sync(_shell || defaultShell) : process.env;
+      process.env['APPIMAGE'] && process.env['APPDIR'] ? shellEnvSync(_shell || defaultShell) : process.env;
     const baseEnv: Record<string, string> = {
       ...cleanEnv,
       LANG: `${osLocale.sync().replace(/-/, '_')}.UTF-8`,

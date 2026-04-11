@@ -204,6 +204,25 @@
                     "description": "choose either `'vertical'`, if you want the column mode when Option key is hold during selection (Default)\nor `'force'`, if you want to force selection regardless of whether the terminal is in mouse events mode\n(inside tmux or vim with mouse mode enabled for example).",
                     "type": "string"
                 },
+                "opacity": {
+                    "description": "set the window opacity. accepts either a single opacity value or `{focus, blur}` values for focused and unfocused windows. works on macOS and Windows.",
+                    "anyOf": [
+                        {
+                            "type": "number"
+                        },
+                        {
+                            "properties": {
+                                "focus": {
+                                    "type": "number"
+                                },
+                                "blur": {
+                                    "type": "number"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ]
+                },
                 "modifierKeys": {
                     "properties": {
                         "altIsMeta": {
@@ -226,6 +245,15 @@
                 "preserveCWD": {
                     "description": "set to true to preserve working directory when creating splits or tabs",
                     "type": "boolean"
+                },
+                "hypercwd": {
+                    "description": "legacy compatibility with the `hypercwd` plugin configuration",
+                    "properties": {
+                        "initialWorkingDirectory": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
                 },
                 "quickEdit": {
                     "description": "if `true` on right click selected text will be copied or pasted if no\nselection is present (`true` by default on Windows and disables the context menu feature)",
@@ -332,6 +360,10 @@
                             "description": "if `true` hyper will not check for updates",
                             "type": "boolean"
                         },
+                        "quitOnLastWindowClosed": {
+                            "description": "if `true`, quit the app on macOS when the last window is closed",
+                            "type": "boolean"
+                        },
                         "updateChannel": {
                             "description": "choose either `'stable'` for receiving highly polished, or `'canary'` for less polished but more frequent updates",
                             "enum": [
@@ -348,6 +380,7 @@
                         "autoUpdatePlugins",
                         "defaultSSHApp",
                         "disableAutoUpdates",
+                        "quitOnLastWindowClosed",
                         "updateChannel"
                     ],
                     "type": "object"
@@ -531,6 +564,25 @@
                             "description": "choose either `'vertical'`, if you want the column mode when Option key is hold during selection (Default)\nor `'force'`, if you want to force selection regardless of whether the terminal is in mouse events mode\n(inside tmux or vim with mouse mode enabled for example).",
                             "type": "string"
                         },
+                        "opacity": {
+                            "description": "set the window opacity. accepts either a single opacity value or `{focus, blur}` values for focused and unfocused windows. works on macOS and Windows.",
+                            "anyOf": [
+                                {
+                                    "type": "number"
+                                },
+                                {
+                                    "properties": {
+                                        "focus": {
+                                            "type": "number"
+                                        },
+                                        "blur": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            ]
+                        },
                         "modifierKeys": {
                             "properties": {
                                 "altIsMeta": {
@@ -553,6 +605,15 @@
                         "preserveCWD": {
                             "description": "set to true to preserve working directory when creating splits or tabs",
                             "type": "boolean"
+                        },
+                        "hypercwd": {
+                            "description": "legacy compatibility with the `hypercwd` plugin configuration",
+                            "properties": {
+                                "initialWorkingDirectory": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
                         },
                         "quickEdit": {
                             "description": "if `true` on right click selected text will be copied or pasted if no\nselection is present (`true` by default on Windows and disables the context menu feature)",
@@ -753,4 +814,3 @@
     },
     "type": "object"
 }
-

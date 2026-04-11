@@ -7,7 +7,7 @@ import {app} from 'electron';
 
 import isDev from 'electron-is-dev';
 
-const cfgFile = 'hyper.json';
+const cfgFile = 'hyper-revamp.json';
 const defaultCfgFile = 'config-default.json';
 const schemaFile = 'schema.json';
 const homeDirectory = homedir();
@@ -15,6 +15,12 @@ const homeDirectory = homedir();
 // If the user defines XDG_CONFIG_HOME they definitely want their config there,
 // otherwise use the home directory in linux/mac and userdata in windows
 let cfgDir = process.env.XDG_CONFIG_HOME
+  ? join(process.env.XDG_CONFIG_HOME, 'hyper-revamp')
+  : process.platform === 'win32'
+    ? app.getPath('userData')
+    : join(homeDirectory, '.config', 'hyper-revamp');
+
+const previousCfgDir = process.env.XDG_CONFIG_HOME
   ? join(process.env.XDG_CONFIG_HOME, 'Hyper')
   : process.platform === 'win32'
     ? app.getPath('userData')
@@ -30,6 +36,7 @@ const legacyCfgPath = join(
 );
 
 let cfgPath = join(cfgDir, cfgFile);
+const previousCfgPath = join(previousCfgDir, 'hyper.json');
 const schemaPath = resolve(__dirname, schemaFile);
 
 const devDir = resolve(__dirname, '../..');
@@ -55,8 +62,8 @@ const plugs = {
   cache: resolve(plugins, 'cache')
 };
 const yarn = resolve(__dirname, '../../bin/yarn-standalone.js');
-const cliScriptPath = resolve(__dirname, '../../bin/hyper');
-const cliLinkPath = '/usr/local/bin/hyper';
+const cliScriptPath = resolve(__dirname, '../../bin/hyper-revamp');
+const cliLinkPath = '/usr/local/bin/hyper-revamp';
 
 const icon = resolve(__dirname, '../static/icon96x96.png');
 
@@ -81,6 +88,7 @@ const defaultPlatformKeyPath = () => {
 export {
   cfgDir,
   cfgPath,
+  previousCfgPath,
   legacyCfgPath,
   cfgFile,
   defaultCfg,

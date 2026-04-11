@@ -49,7 +49,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   selectionColor: 'rgba(248,28,229,0.3)',
   fontSize: 12,
   padding: '12px 14px',
-  fontFamily: 'Menlo, "DejaVu Sans Mono", "Lucida Console", monospace',
+  fontFamily: '"Cascadia Code", Menlo, "DejaVu Sans Mono", "Lucida Console", monospace',
   uiFontFamily:
     '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
   fontSizeOverride: null,

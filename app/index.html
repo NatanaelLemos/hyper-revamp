@@ -1,16 +1,52 @@
 <!doctype html>
 <html>
   <head>
-    <title>Hyper</title>
+    <title>hyper-revamp</title>
 
     <meta charset="utf-8">
     <meta name="viewport" content="initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob: data:; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self' https:; object-src 'none'; base-uri 'none'; form-action 'none'"
+    >
 
     <style>
+      @font-face {
+        font-family: 'Cascadia Code';
+        src: url('./static/fonts/CascadiaCode-Regular.ttf') format('truetype');
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: 'Cascadia Code';
+        src: url('./static/fonts/CascadiaCode-Italic.ttf') format('truetype');
+        font-style: italic;
+        font-weight: 400;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: 'Cascadia Code';
+        src: url('./static/fonts/CascadiaCode-Bold.ttf') format('truetype');
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: 'Cascadia Code';
+        src: url('./static/fonts/CascadiaCode-BoldItalic.ttf') format('truetype');
+        font-style: italic;
+        font-weight: 700;
+        font-display: swap;
+      }
+
       body {
         color: #fff;
         -webkit-backface-visibility: hidden;
+        background: #05070b;
       }
 
       * {

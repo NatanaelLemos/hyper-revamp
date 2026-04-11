@@ -23,6 +23,7 @@ import notify from './notify';
 import {availableExtensions} from './plugins/extensions';
 import {install} from './plugins/install';
 import mapKeys from './utils/map-keys';
+import {isSafeExternalUrl} from './utils/url-safety';
 
 // local storage
 const cache = new Config();
@@ -208,8 +209,8 @@ if (cache.get('hyper.plugins') !== id || process.env.HYPER_FORCE_UPDATE) {
 function syncPackageJSON() {
   const dependencies = toDependencies(plugins);
   const pkg = {
-    name: 'hyper-plugins',
-    description: 'Auto-generated from `hyper.json`!',
+    name: 'hyper-revamp-plugins',
+    description: 'Auto-generated from `hyper-revamp.json`!',
     private: true,
     version: '0.0.1',
     repository: 'vercel/hyper',
@@ -496,8 +497,7 @@ ipcMain.handle('getProfileName', (event) => {
 });
 
 ipcMain.handle('shell:openExternal', (event, url) => {
-  // Only allow http/https URLs to prevent file:// or custom protocol abuse
-  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+  if (isSafeExternalUrl(url)) {
     return shell.openExternal(url);
   }
   console.warn(`Blocked shell:openExternal for non-http URL: ${url}`);

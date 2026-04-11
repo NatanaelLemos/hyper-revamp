@@ -20,6 +20,7 @@ import configureStore from './store/configure-store';
 import * as config from './utils/config';
 import {getBase64FileData} from './utils/file';
 import * as plugins from './utils/plugins';
+import SettingsApp from './settings';
 
 // On Linux, the default zoom was somehow changed with Electron 3 (or maybe 2).
 // Setting zoom factor to 1.2 brings back the normal default size
@@ -43,11 +44,21 @@ const fetchFileData = (configData: configOptions, store_: ReturnType<typeof conf
 };
 
 async function bootstrap() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('view') === 'settings') {
+    const root = createRoot(document.getElementById('mount')!);
+    root.render(<SettingsApp />);
+    return;
+  }
+
+  console.log('renderer bootstrap start');
   // Initialize config (fetches profileName via IPC)
   await config.init();
+  console.log('renderer config init done');
 
   // Initialize plugins (loads modules via IPC)
   await plugins.init();
+  console.log('renderer plugins init done');
 
   const store_ = configureStore();
 
@@ -60,6 +71,7 @@ async function bootstrap() {
   const cfg = await config.getConfig();
   store_.dispatch(loadConfig(cfg));
   fetchFileData(cfg, store_);
+  console.log('renderer initial config loaded');
 
   config.subscribe(() => {
     void (async () => {
@@ -81,7 +93,9 @@ async function bootstrap() {
   // initialize communication with main electron process
   // and subscribe to all user intents for example from menus
   rpc.on('ready', () => {
+    console.log('renderer rpc ready');
     store_.dispatch(init());
+    console.log('renderer init dispatched');
     store_.dispatch(uiActions.setFontSmoothing());
   });
 
@@ -245,12 +259,14 @@ async function bootstrap() {
   });
 
   const root = createRoot(document.getElementById('mount')!);
+  console.log('renderer root created');
 
   root.render(
     <Provider store={store_}>
       <HyperContainer />
     </Provider>
   );
+  console.log('renderer root rendered');
 
   rpc.on('reload', () => {
     void plugins.reload();

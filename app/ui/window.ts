@@ -22,8 +22,36 @@ import Session from '../session';
 import updater from '../updater';
 import {setRendererType, unsetRendererType} from '../utils/renderer-utils';
 import toElectronBackgroundColor from '../utils/to-electron-background-color';
+import {isSafeExternalUrl} from '../utils/url-safety';
 
 import contextMenuTemplate from './contextmenu';
+
+const clampOpacity = (value: unknown) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return undefined;
+  }
+
+  return Math.min(1, Math.max(0, value));
+};
+
+const getResolvedOpacity = (opacityConfig: configOptions['opacity'], isFocused: boolean) => {
+  if (typeof opacityConfig === 'number') {
+    return clampOpacity(opacityConfig);
+  }
+
+  if (!opacityConfig || typeof opacityConfig !== 'object') {
+    return undefined;
+  }
+
+  const focusedOpacity = clampOpacity(opacityConfig.focus);
+  const blurredOpacity = clampOpacity(opacityConfig.blur);
+
+  if (isFocused) {
+    return focusedOpacity ?? blurredOpacity;
+  }
+
+  return blurredOpacity ?? focusedOpacity;
+};
 
 export function newWindow(
   options_: BrowserWindowConstructorOptions,
@@ -39,7 +67,7 @@ export function newWindow(
     minHeight: 190,
     backgroundColor: toElectronBackgroundColor(cfg.backgroundColor || '#000'),
     titleBarStyle: 'hiddenInset',
-    title: 'Hyper.app',
+    title: 'hyper-revamp',
     // we want to go frameless on Windows and Linux
     frame: process.platform === 'darwin',
     transparent: process.platform === 'darwin',
@@ -60,6 +88,22 @@ export function newWindow(
   };
   const window = new BrowserWindow(app.plugins.getDecoratedBrowserOptions(winOpts));
 
+  window.webContents.on('did-finish-load', () => {
+    console.log('renderer did-finish-load', window.uid);
+  });
+
+  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('renderer did-fail-load', {errorCode, errorDescription, validatedURL});
+  });
+
+  window.webContents.on('render-process-gone', (_event, details) => {
+    console.error('renderer process gone', details);
+  });
+
+  window.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log('renderer console', {level, message, line, sourceId});
+  });
+
   window.profileName = profileName;
 
   window.uid = classOpts.uid;
@@ -73,6 +117,19 @@ export function newWindow(
   const updateBackgroundColor = () => {
     const cfg_ = app.plugins.getDecoratedConfig(profileName);
     window.setBackgroundColor(toElectronBackgroundColor(cfg_.backgroundColor || '#000'));
+  };
+
+  const updateWindowOpacity = (isFocused: boolean) => {
+    if (process.platform === 'linux') {
+      return;
+    }
+
+    const resolvedOpacity = getResolvedOpacity(cfg.opacity, isFocused);
+    if (resolvedOpacity !== undefined) {
+      window.setOpacity(resolvedOpacity);
+    } else {
+      window.setOpacity(1);
+    }
   };
 
   // config changes
@@ -91,11 +148,14 @@ export function newWindow(
     updateBackgroundColor();
 
     cfg = cfg_;
+    updateWindowOpacity(window.isFocused());
   });
 
   rpc.on('init', () => {
+    console.log('window init', {uid: window.uid});
     window.show();
     updateBackgroundColor();
+    updateWindowOpacity(window.isFocused());
 
     // If no callback is passed to createWindow,
     // a new session will be created by default.
@@ -181,7 +241,16 @@ export function newWindow(
   }
 
   rpc.on('new', (extraOptions) => {
-    const {session, options} = createSession(extraOptions);
+    console.log('session create requested', {windowUid: window.uid, extraOptions});
+    let session;
+    let options;
+    try {
+      ({session, options} = createSession(extraOptions));
+    } catch (error) {
+      console.error('session create failed', error);
+      return;
+    }
+    console.log('session created', {uid: options.uid, shell: session.shell, hasPty: Boolean(session.pty)});
 
     sessions.set(options.uid, session);
     rpc.emit('session add', {
@@ -200,6 +269,7 @@ export function newWindow(
     });
 
     session.on('exit', () => {
+      console.log('session exited', {uid: options.uid});
       rpc.emit('session exit', {uid: options.uid});
       unsetRendererType(options.uid);
       sessions.delete(options.uid);
@@ -246,7 +316,11 @@ export function newWindow(
     setRendererType(uid, type);
   });
   rpc.on('open external', ({url}) => {
-    void shell.openExternal(url);
+    if (isSafeExternalUrl(url)) {
+      void shell.openExternal(url);
+    } else {
+      console.warn(`Blocked open external request for unsafe URL: ${url}`);
+    }
   });
   rpc.on('open context menu', (selection) => {
     const {createWindow} = app;
@@ -299,7 +373,13 @@ export function newWindow(
   });
 
   const handleDroppedURL = (url: string) => {
-    const protocol = typeof url === 'string' && new URL(url).protocol;
+    let protocol: string | false = false;
+    try {
+      protocol = typeof url === 'string' && new URL(url).protocol;
+    } catch {
+      return;
+    }
+
     if (protocol === 'file:') {
       const path = fileURLToPath(url);
       return {uid: null, data: path, escaped: true};
@@ -315,6 +395,16 @@ export function newWindow(
     if (data) {
       event.preventDefault();
       rpc.emit('session data send', data);
+      return;
+    }
+
+    if (url !== window.webContents.getURL()) {
+      event.preventDefault();
+      if (isSafeExternalUrl(url)) {
+        void shell.openExternal(url);
+      } else {
+        console.warn(`Blocked navigation to unsafe URL: ${url}`);
+      }
     }
   });
   window.webContents.setWindowOpenHandler(({url}) => {
@@ -323,7 +413,13 @@ export function newWindow(
       rpc.emit('session data send', data);
       return {action: 'deny'};
     }
-    return {action: 'allow'};
+
+    if (isSafeExternalUrl(url)) {
+      void shell.openExternal(url);
+    } else {
+      console.warn(`Blocked popup for unsafe URL: ${url}`);
+    }
+    return {action: 'deny'};
   });
 
   // expose internals to extension authors
@@ -354,6 +450,11 @@ export function newWindow(
 
   window.on('focus', () => {
     updateFocusTime();
+    updateWindowOpacity(true);
+  });
+
+  window.on('blur', () => {
+    updateWindowOpacity(false);
   });
 
   // the window can be closed by the browser process itself

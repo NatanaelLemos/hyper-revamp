@@ -192,12 +192,12 @@ export type HyperActions = (
 import type configureStore from '../lib/store/configure-store';
 export type HyperDispatch = ReturnType<typeof configureStore>['dispatch'];
 
-import type {ReactChild, ReactNode} from 'react';
+import type {ReactNode} from 'react';
 type extensionProps = Partial<{
-  customChildren: ReactChild | ReactChild[];
-  customChildrenBefore: ReactChild | ReactChild[];
+  customChildren: ReactNode;
+  customChildrenBefore: ReactNode;
   customCSS: string;
-  customInnerChildren: ReactChild | ReactChild[];
+  customInnerChildren: ReactNode;
 }>;
 
 import type {HeaderConnectedProps} from '../lib/containers/header';

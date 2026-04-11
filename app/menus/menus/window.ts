@@ -1,4 +1,6 @@
-import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
+import type {BaseWindow, BrowserWindow, MenuItemConstructorOptions} from 'electron';
+
+const asBrowserWindow = (focusedWindow?: BaseWindow) => focusedWindow as BrowserWindow | undefined;
 
 const windowMenu = (
   commandKeys: Record<string, string>,
@@ -37,14 +39,14 @@ const windowMenu = (
             label: 'Previous',
             accelerator: commandKeys['tab:prev'],
             click: (item, focusedWindow) => {
-              execCommand('tab:prev', focusedWindow);
+              execCommand('tab:prev', asBrowserWindow(focusedWindow));
             }
           },
           {
             label: 'Next',
             accelerator: commandKeys['tab:next'],
             click: (item, focusedWindow) => {
-              execCommand('tab:next', focusedWindow);
+              execCommand('tab:next', asBrowserWindow(focusedWindow));
             }
           },
           {
@@ -63,14 +65,14 @@ const windowMenu = (
             label: 'Previous',
             accelerator: commandKeys['pane:prev'],
             click: (item, focusedWindow) => {
-              execCommand('pane:prev', focusedWindow);
+              execCommand('pane:prev', asBrowserWindow(focusedWindow));
             }
           },
           {
             label: 'Next',
             accelerator: commandKeys['pane:next'],
             click: (item, focusedWindow) => {
-              execCommand('pane:next', focusedWindow);
+              execCommand('pane:next', asBrowserWindow(focusedWindow));
             }
           }
         ]
@@ -84,7 +86,7 @@ const windowMenu = (
       {
         label: 'Toggle Always on Top',
         click: (item, focusedWindow) => {
-          execCommand('window:toggleKeepOnTop', focusedWindow);
+          execCommand('window:toggleKeepOnTop', asBrowserWindow(focusedWindow));
         }
       },
       {

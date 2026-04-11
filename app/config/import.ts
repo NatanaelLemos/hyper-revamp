@@ -1,11 +1,11 @@
-import {readFileSync, mkdirpSync} from 'fs-extra';
+import {copyFileSync, existsSync, readFileSync, mkdirpSync} from 'fs-extra';
 
 import type {rawConfig} from '../../typings/config';
 import notify from '../notify';
 
 import {_init} from './init';
 import {migrateHyper3Config} from './migrate';
-import {defaultCfg, cfgPath, plugs, defaultPlatformKeyPath} from './paths';
+import {defaultCfg, cfgPath, previousCfgPath, plugs, defaultPlatformKeyPath} from './paths';
 
 let defaultConfig: rawConfig;
 
@@ -43,8 +43,20 @@ const _importConf = () => {
   try {
     userCfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
   } catch (err) {
-    notify("Couldn't parse config file. Using default config instead.");
-    userCfg = JSON.parse(defaultCfgRaw);
+    if (existsSync(previousCfgPath)) {
+      try {
+        copyFileSync(previousCfgPath, cfgPath);
+        notify('Configuration migrated', `Copied your existing Hyper config to ${cfgPath}`);
+        userCfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
+      } catch (migrationError) {
+        console.error('Config migration failed', migrationError);
+        notify("Couldn't parse config file. Using default config instead.");
+        userCfg = JSON.parse(defaultCfgRaw);
+      }
+    } else {
+      notify("Couldn't parse config file. Using default config instead.");
+      userCfg = JSON.parse(defaultCfgRaw);
+    }
   }
 
   return {userCfg, defaultCfg: _defaultCfg};

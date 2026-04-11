@@ -31,10 +31,10 @@ const addSymlink = async (silent: boolean) => {
   try {
     const isInstalled = await checkInstall();
     if (isInstalled) {
-      console.log('Hyper CLI already in PATH');
+      console.log('hyper-revamp CLI already in PATH');
       return;
     }
-    console.log('Linking HyperCLI');
+    console.log('Linking hyper-revamp CLI');
     if (!existsSync(path.dirname(cliLinkPath))) {
       try {
         mkdirpSync(path.dirname(cliLinkPath));
@@ -54,7 +54,7 @@ const addSymlink = async (silent: boolean) => {
     // Need sudo access to create symlink
     if (err.code === 'EACCES' && !silent) {
       const result = await dialog.showMessageBox({
-        message: `You need to grant elevated privileges to add Hyper CLI to PATH
+        message: `You need to grant elevated privileges to add the hyper-revamp CLI to PATH
 Or you can run
 sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`,
         type: 'info',
@@ -62,7 +62,7 @@ sudo ln -sf "${cliScriptPath}" "${cliLinkPath}"`,
       });
       if (result.response === 0) {
         try {
-          await sudoExec(`ln -sf "${cliScriptPath}" "${cliLinkPath}"`, {name: 'Hyper'});
+          await sudoExec(`ln -sf "${cliScriptPath}" "${cliLinkPath}"`, {name: 'hyper-revamp'});
           return;
         } catch (_error) {
           error = (_error as any[])[0];
@@ -102,7 +102,7 @@ const addBinToUserPath = () => {
         const existingPath = pathParts.includes(binPath);
         const existingOldPath = pathParts.some((pathPart) => pathPart.startsWith(oldPath));
         if (existingPath && !existingOldPath) {
-          console.log('Hyper CLI already in PATH');
+          console.log('hyper-revamp CLI already in PATH');
           Registry.closeKey(envKey);
           resolve();
           return;
@@ -114,7 +114,7 @@ const addBinToUserPath = () => {
         if (!pathParts.includes(binPath)) pathParts.push(binPath);
         newPathValue = pathParts.join(';');
       }
-      console.log('Adding HyperCLI path (registry)');
+      console.log('Adding hyper-revamp CLI path (registry)');
       Registry.setValueRaw(envKey, pathItemName, type, Registry.formatString(newPathValue));
       Registry.closeKey(envKey);
       resolve();
@@ -135,11 +135,15 @@ export const installCLI = async (withNotification: boolean) => {
       await addBinToUserPath();
       logNotify(
         withNotification,
-        'Hyper CLI installed',
+        'hyper-revamp CLI installed',
         'You may need to restart your computer to complete this installation process.'
       );
     } catch (err) {
-      logNotify(withNotification, 'Hyper CLI installation failed', `Failed to add Hyper CLI path to user PATH ${err}`);
+      logNotify(
+        withNotification,
+        'hyper-revamp CLI installation failed',
+        `Failed to add hyper-revamp CLI path to user PATH ${err}`
+      );
     }
   } else if (process.platform === 'darwin' || process.platform === 'linux') {
     // AppImages are mounted on run at a temporary path, don't create symlink
@@ -149,11 +153,11 @@ export const installCLI = async (withNotification: boolean) => {
     }
     try {
       await addSymlink(!withNotification);
-      logNotify(withNotification, 'Hyper CLI installed', `Symlink created at ${cliLinkPath}`);
+      logNotify(withNotification, 'hyper-revamp CLI installed', `Symlink created at ${cliLinkPath}`);
     } catch (error) {
-      logNotify(withNotification, 'Hyper CLI installation failed', `${error}`);
+      logNotify(withNotification, 'hyper-revamp CLI installation failed', `${error}`);
     }
   } else {
-    logNotify(withNotification, 'Hyper CLI installation failed', `Unsupported platform ${process.platform}`);
+    logNotify(withNotification, 'hyper-revamp CLI installation failed', `Unsupported platform ${process.platform}`);
   }
 };

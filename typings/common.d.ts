@@ -4,7 +4,7 @@ import type {IpcMain, IpcRenderer} from 'electron';
 
 import type parseUrl from 'parse-url';
 
-import type {configOptions} from './config';
+import type {configOptions, rawConfig} from './config';
 
 export type Session = {
   uid: string;
@@ -126,6 +126,20 @@ export type IpcCommands = {
   getDecoratedConfig: (profile: string) => configOptions;
   getDecoratedKeymaps: () => Record<string, string[]>;
   getProfileName: () => string;
+  'settings:get': () => {
+    configPath: string;
+    rawText: string;
+    rawConfig: rawConfig;
+    defaultConfig: rawConfig;
+    schema: Record<string, any>;
+  };
+  'settings:save': (text: string) => {
+    configPath: string;
+    rawText: string;
+    rawConfig: rawConfig;
+    defaultConfig: rawConfig;
+    schema: Record<string, any>;
+  };
   'shell:openExternal': (url: string) => void;
 };
 

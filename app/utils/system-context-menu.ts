@@ -3,13 +3,13 @@ import type {HKEY} from 'native-reg';
 
 const appPath = `"${process.execPath}"`;
 const regKeys = [
-  `Software\\Classes\\Directory\\Background\\shell\\Hyper`,
-  `Software\\Classes\\Directory\\shell\\Hyper`,
-  `Software\\Classes\\Drive\\shell\\Hyper`
+  `Software\\Classes\\Directory\\Background\\shell\\hyper-revamp`,
+  `Software\\Classes\\Directory\\shell\\hyper-revamp`,
+  `Software\\Classes\\Drive\\shell\\hyper-revamp`
 ];
 const regParts = [
   {key: 'command', name: '', value: `${appPath} "%V"`},
-  {name: '', value: 'Open &Hyper here'},
+  {name: '', value: 'Open &hyper-revamp here'},
   {name: 'Icon', value: `${appPath}`}
 ];
 

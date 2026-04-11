@@ -3,6 +3,7 @@ import type {BrowserWindow} from 'electron';
 
 import {openConfig, getConfig} from './config';
 import {updatePlugins} from './plugins';
+import {openSettingsWindow} from './settings';
 import {installCLI} from './utils/cli-install';
 import * as systemContextMenu from './utils/system-context-menu';
 
@@ -28,7 +29,7 @@ const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
     focusedWindow?.rpc.emit('termgroup close req');
   },
   'window:preferences': () => {
-    void openConfig();
+    openSettingsWindow();
   },
   'editor:clearBuffer': (focusedWindow) => {
     focusedWindow?.rpc.emit('session clear req');
@@ -121,6 +122,9 @@ const commands: Record<string, (focusedWindow?: BrowserWindow) => void> = {
   },
   'cli:install': () => {
     void installCLI(true);
+  },
+  'window:openConfigFile': () => {
+    void openConfig();
   },
   'window:hamburgerMenu': () => {
     if (process.platform !== 'darwin' && ['', true].includes(getConfig().showHamburgerMenu)) {

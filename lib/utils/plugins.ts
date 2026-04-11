@@ -47,25 +47,39 @@ let connectors: {
   Header: {state: any[]; dispatch: any[]};
   Hyper: {state: any[]; dispatch: any[]};
   Notifications: {state: any[]; dispatch: any[]};
+} = {
+  Terms: {state: [], dispatch: []},
+  Header: {state: [], dispatch: []},
+  Hyper: {state: [], dispatch: []},
+  Notifications: {state: [], dispatch: []}
 };
-let middlewares: Middleware[];
-let uiReducers: IUiReducer[];
-let sessionsReducers: ISessionReducer[];
-let termGroupsReducers: ITermGroupReducer[];
-let tabPropsDecorators: any[];
-let tabsPropsDecorators: any[];
-let termPropsDecorators: any[];
-let termGroupPropsDecorators: any[];
+let middlewares: Middleware[] = [];
+let uiReducers: IUiReducer[] = [];
+let sessionsReducers: ISessionReducer[] = [];
+let termGroupsReducers: ITermGroupReducer[] = [];
+let tabPropsDecorators: any[] = [];
+let tabsPropsDecorators: any[] = [];
+let termPropsDecorators: any[] = [];
+let termGroupPropsDecorators: any[] = [];
 let propsDecorators: {
   getTermProps: any[];
   getTabProps: any[];
   getTabsProps: any[];
   getTermGroupProps: any[];
+} = {
+  getTermProps: termPropsDecorators,
+  getTabProps: tabPropsDecorators,
+  getTabsProps: tabsPropsDecorators,
+  getTermGroupProps: termGroupPropsDecorators
 };
 let reducersDecorators: {
   reduceUI: IUiReducer[];
   reduceSessions: ISessionReducer[];
   reduceTermGroups: ITermGroupReducer[];
+} = {
+  reduceUI: uiReducers,
+  reduceSessions: sessionsReducers,
+  reduceTermGroups: termGroupsReducers
 };
 
 // expose decorated component instance to the higher-order components

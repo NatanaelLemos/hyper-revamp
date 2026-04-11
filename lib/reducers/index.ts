@@ -11,4 +11,4 @@ export default combineReducers({
   ui,
   sessions,
   termGroups
-}) as Reducer<HyperState, HyperActions>;
+}) as unknown as Reducer<HyperState, HyperActions>;

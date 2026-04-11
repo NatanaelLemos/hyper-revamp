@@ -16,6 +16,7 @@ export default class Client {
   emitter: TypedEmitter<RendererEvents>;
   ipc: IpcRendererWithCommands;
   id!: string;
+  ready = false;
 
   constructor() {
     this.emitter = new EventEmitter();
@@ -25,6 +26,7 @@ export default class Client {
       setTimeout(() => {
         this.id = window.__rpcId;
         this.ipc.on(this.id, this.ipcListener);
+        this.ready = true;
         this.emitter.emit('ready');
       }, 0);
     } else {
@@ -37,6 +39,7 @@ export default class Client {
         // window.profileName = profileName;
         this.id = uid;
         this.ipc.on(uid, this.ipcListener);
+        this.ready = true;
         this.emitter.emit('ready');
       });
     }
@@ -49,6 +52,11 @@ export default class Client {
 
   on = <U extends keyof RendererEvents>(ev: U, fn: (arg0: RendererEvents[U]) => void) => {
     this.emitter.on(ev, fn);
+    if (ev === 'ready' && this.ready) {
+      setTimeout(() => {
+        fn(undefined as unknown as RendererEvents[U]);
+      }, 0);
+    }
     return this;
   };
 

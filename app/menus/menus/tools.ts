@@ -15,9 +15,15 @@ const toolsMenu = (
         }
       },
       {
-        label: 'Install Hyper CLI command in PATH',
+        label: 'Install hyper-revamp CLI command in PATH',
         click() {
           execCommand('cli:install');
+        }
+      },
+      {
+        label: 'Open hyper-revamp config file',
+        click() {
+          execCommand('window:openConfigFile');
         }
       },
       {
@@ -26,13 +32,13 @@ const toolsMenu = (
       ...(process.platform === 'win32'
         ? <MenuItemConstructorOptions[]>[
             {
-              label: 'Add Hyper to system context menu',
+              label: 'Add hyper-revamp to system context menu',
               click() {
                 execCommand('systemContextMenu:add');
               }
             },
             {
-              label: 'Remove Hyper from system context menu',
+              label: 'Remove hyper-revamp from system context menu',
               click() {
                 execCommand('systemContextMenu:remove');
               }

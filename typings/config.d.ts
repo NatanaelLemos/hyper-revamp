@@ -19,6 +19,8 @@ export type ColorMap = {
   yellow: string;
 };
 
+type WindowOpacity = number | {focus?: number; blur?: number};
+
 type rootConfigOptions = {
   /**
    * if `true` (default), Hyper will update plugins every 5 hours
@@ -29,6 +31,10 @@ type rootConfigOptions = {
   defaultSSHApp: boolean;
   /** if `true` hyper will not check for updates */
   disableAutoUpdates: boolean;
+  /**
+   * if `true`, quit the app on macOS when the last window is closed
+   */
+  quitOnLastWindowClosed: boolean;
   /** choose either `'stable'` for receiving highly polished, or `'canary'` for less polished but more frequent updates */
   updateChannel: 'stable' | 'canary';
   useConpty?: boolean;
@@ -106,6 +112,12 @@ type profileConfigOptions = {
    * (inside tmux or vim with mouse mode enabled for example).
    */
   macOptionSelectionMode: string;
+  /**
+   * set the window opacity. accepts either a single opacity value
+   * or `{focus, blur}` values for focused and unfocused windows.
+   * works on macOS and Windows.
+   */
+  opacity?: WindowOpacity;
   modifierKeys?: {
     altIsMeta: boolean;
     cmdIsMeta: boolean;
@@ -116,6 +128,12 @@ type profileConfigOptions = {
    * set to true to preserve working directory when creating splits or tabs
    */
   preserveCWD: boolean;
+  /**
+   * legacy compatibility with the `hypercwd` plugin configuration
+   */
+  hypercwd?: {
+    initialWorkingDirectory?: string;
+  };
   /**
    * if `true` on right click selected text will be copied or pasted if no
    * selection is present (`true` by default on Windows and disables the context menu feature)

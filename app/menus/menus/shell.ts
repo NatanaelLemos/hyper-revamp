@@ -1,4 +1,6 @@
-import type {BrowserWindow, MenuItemConstructorOptions} from 'electron';
+import type {BaseWindow, BrowserWindow, MenuItemConstructorOptions} from 'electron';
+
+const asBrowserWindow = (focusedWindow?: BaseWindow) => focusedWindow as BrowserWindow | undefined;
 
 const shellMenu = (
   commandKeys: Record<string, string>,
@@ -14,14 +16,14 @@ const shellMenu = (
         label: 'New Tab',
         accelerator: commandKeys['tab:new'],
         click(item, focusedWindow) {
-          execCommand('tab:new', focusedWindow);
+          execCommand('tab:new', asBrowserWindow(focusedWindow));
         }
       },
       {
         label: 'New Window',
         accelerator: commandKeys['window:new'],
         click(item, focusedWindow) {
-          execCommand('window:new', focusedWindow);
+          execCommand('window:new', asBrowserWindow(focusedWindow));
         }
       },
       {
@@ -31,14 +33,14 @@ const shellMenu = (
         label: 'Split Down',
         accelerator: commandKeys['pane:splitDown'],
         click(item, focusedWindow) {
-          execCommand('pane:splitDown', focusedWindow);
+          execCommand('pane:splitDown', asBrowserWindow(focusedWindow));
         }
       },
       {
         label: 'Split Right',
         accelerator: commandKeys['pane:splitRight'],
         click(item, focusedWindow) {
-          execCommand('pane:splitRight', focusedWindow);
+          execCommand('pane:splitRight', asBrowserWindow(focusedWindow));
         }
       },
       {
@@ -52,14 +54,14 @@ const shellMenu = (
               label: 'New Tab',
               accelerator: commandKeys[`tab:new:${profile}`],
               click(item, focusedWindow) {
-                execCommand(`tab:new:${profile}`, focusedWindow);
+                execCommand(`tab:new:${profile}`, asBrowserWindow(focusedWindow));
               }
             },
             {
               label: 'New Window',
               accelerator: commandKeys[`window:new:${profile}`],
               click(item, focusedWindow) {
-                execCommand(`window:new:${profile}`, focusedWindow);
+                execCommand(`window:new:${profile}`, asBrowserWindow(focusedWindow));
               }
             },
             {
@@ -69,14 +71,14 @@ const shellMenu = (
               label: 'Split Down',
               accelerator: commandKeys[`pane:splitDown:${profile}`],
               click(item, focusedWindow) {
-                execCommand(`pane:splitDown:${profile}`, focusedWindow);
+                execCommand(`pane:splitDown:${profile}`, asBrowserWindow(focusedWindow));
               }
             },
             {
               label: 'Split Right',
               accelerator: commandKeys[`pane:splitRight:${profile}`],
               click(item, focusedWindow) {
-                execCommand(`pane:splitRight:${profile}`, focusedWindow);
+                execCommand(`pane:splitRight:${profile}`, asBrowserWindow(focusedWindow));
               }
             }
           ]
@@ -89,7 +91,7 @@ const shellMenu = (
         label: 'Close',
         accelerator: commandKeys['pane:close'],
         click(item, focusedWindow) {
-          execCommand('pane:close', focusedWindow);
+          execCommand('pane:close', asBrowserWindow(focusedWindow));
         }
       },
       {

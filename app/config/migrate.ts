@@ -179,12 +179,12 @@ export const migrateHyper3Config = () => {
   } catch (e) {
     console.error(e);
     notify(
-      'Hyper 4',
+      'hyper-revamp',
       `Failed to migrate your config from Hyper 3.\nDefault config will be created instead at ${cfgPath}`
     );
     newCfgData = defaultCfgData;
   }
   _write(cfgPath, JSON.stringify(newCfgData, null, 2));
 
-  notify('Hyper 4', `Settings location and format has changed to ${cfgPath}`);
+  notify('hyper-revamp', `Settings location and format has changed to ${cfgPath}`);
 };
