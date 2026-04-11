@@ -44,7 +44,7 @@ const configGroups: FieldGroup[] = [
   {
     title: 'Shell And Sessions',
     description: 'Startup shell, working directory behavior, profiles, and native cwd-preservation settings.',
-    fields: ['shell', 'shellArgs', 'workingDirectory', 'preserveCWD', 'hypercwd', 'defaultProfile', 'profiles', 'windowSize']
+    fields: ['shell', 'shellArgs', 'workingDirectory', 'preserveCWD', 'hypercwd', 'defaultProfile', 'windowSize']
   },
   {
     title: 'Typography',
@@ -73,6 +73,7 @@ const configGroups: FieldGroup[] = [
     description: 'Selection, bell, accessibility, rendering, and general terminal interaction defaults.',
     fields: [
       'bell',
+      'bellSound',
       'bellSoundURL',
       'copyOnSelect',
       'quickEdit',
@@ -92,6 +93,13 @@ const configGroups: FieldGroup[] = [
     description: 'Raw environment values and custom CSS hooks for the window and terminal surface.',
     fields: ['env', 'css', 'termCSS']
   }
+];
+
+const profileFields: string[] = [
+  'shell', 'shellArgs', 'workingDirectory',
+  'fontFamily', 'uiFontFamily', 'fontSize', 'fontWeight', 'fontWeightBold', 'lineHeight', 'letterSpacing', 'disableLigatures',
+  'backgroundColor', 'foregroundColor', 'selectionColor', 'borderColor', 'cursorColor', 'cursorAccentColor', 'cursorShape', 'cursorBlink', 'padding', 'opacity', 'colors',
+  'bell', 'bellSound', 'bellSoundURL', 'copyOnSelect', 'quickEdit', 'scrollback', 'env', 'css', 'termCSS'
 ];
 
 const normalizeText = (value: string) => value.replace(/\r\n/g, '\n').trimEnd();
@@ -261,6 +269,7 @@ const serializeEnumValue = (value: unknown) => JSON.stringify(value);
 const parseEnumValue = (value: string) => JSON.parse(value) as unknown;
 
 const FieldShell = ({
+  settingId,
   label,
   description,
   inline,
@@ -268,6 +277,7 @@ const FieldShell = ({
   canReset,
   children
 }: {
+  settingId?: string;
   label: string;
   description?: string;
   inline?: boolean;
@@ -278,11 +288,12 @@ const FieldShell = ({
   <section className={`field ${inline ? 'inline' : ''}`}>
     <div className="field_head">
       <div className="field_meta">
+        {settingId ? <span className="field_id">{settingId}</span> : null}
         <span className="field_label">{label}</span>
         {description ? <span className="field_description">{description}</span> : null}
       </div>
       {canReset ? (
-        <button type="button" className="secondary small ghost" onClick={onReset}>
+        <button type="button" className="reset_btn" onClick={onReset}>
           Reset
         </button>
       ) : null}
@@ -464,6 +475,7 @@ const SettingsApp = () => {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [reloadRequested, setReloadRequested] = useState(false);
+  const [activeProfileIndex, setActiveProfileIndex] = useState(0);
 
   const load = async () => {
     const nextPayload = await ipcRenderer.invoke('settings:get');
@@ -587,11 +599,13 @@ const SettingsApp = () => {
     const effectiveValue = currentValue === undefined ? defaultValue : currentValue;
     const canReset = hasOwnPath(draftObject, path);
     const onReset = () => resetDraftPath(path);
+    const settingId = path.join('.');
 
     if (schema.enum) {
       return (
         <FieldShell
-          key={path.join('.')}
+          key={settingId}
+          settingId={settingId}
           label={label}
           description={schema.description}
           canReset={canReset}
@@ -616,7 +630,7 @@ const SettingsApp = () => {
       const mode = typeof effectiveValue === 'number' || effectiveValue === undefined ? 'single' : 'focusBlur';
       return (
         <div className="nested_card" key={path.join('.')}>
-          <FieldShell label={label} description={schema.description} canReset={canReset} onReset={onReset}>
+          <FieldShell settingId={settingId} label={label} description={schema.description} canReset={canReset} onReset={onReset}>
             <div className="stack">
               <select
                 value={mode}
@@ -655,7 +669,8 @@ const SettingsApp = () => {
     if (schema.type === 'boolean') {
       return (
         <FieldShell
-          key={path.join('.')}
+          key={settingId}
+          settingId={settingId}
           label={label}
           description={schema.description}
           inline
@@ -674,7 +689,8 @@ const SettingsApp = () => {
     if (schema.type === 'number') {
       return (
         <FieldShell
-          key={path.join('.')}
+          key={settingId}
+          settingId={settingId}
           label={label}
           description={schema.description}
           canReset={canReset}
@@ -706,7 +722,8 @@ const SettingsApp = () => {
 
       return (
         <FieldShell
-          key={path.join('.')}
+          key={settingId}
+          settingId={settingId}
           label={label}
           description={schema.description}
           canReset={canReset}
@@ -727,7 +744,8 @@ const SettingsApp = () => {
       if (Array.isArray(schema.items) && schema.items.length === 2 && values.length <= 2) {
         return (
           <FieldShell
-            key={path.join('.')}
+            key={settingId}
+            settingId={settingId}
             label={label}
             description={schema.description}
             canReset={canReset}
@@ -756,7 +774,8 @@ const SettingsApp = () => {
 
       return (
         <FieldShell
-          key={path.join('.')}
+          key={settingId}
+          settingId={settingId}
           label={label}
           description={schema.description}
           canReset={canReset}
@@ -764,7 +783,7 @@ const SettingsApp = () => {
         >
           <div className="stack">
             {values.map((_, index) => (
-              <div className="list_item" key={`${path.join('.')}-${index}`}>
+              <div className="list_item" key={`${settingId}-${index}`}>
                 <div className="list_item_body">
                   {renderField(itemSchema, [...path, index], itemSchema?.type === 'object' ? `${label} ${index + 1}` : `Item ${index + 1}`)}
                 </div>
@@ -876,99 +895,149 @@ const SettingsApp = () => {
     const pluginSectionVisible =
       !normalizedSearch ||
       ['plugins', 'local plugins', 'npm plugins', 'local plugin folders'].some((value) => value.includes(normalizedSearch));
+    const profilesSectionVisible =
+      !normalizedSearch ||
+      ['profiles', 'profile', 'shell', 'font', 'color', 'theme'].some((value) => value.includes(normalizedSearch));
     const keymapsSectionVisible =
       !normalizedSearch ||
       ['keymaps', 'keyboard shortcuts', 'bindings', 'shortcut overrides'].some((value) => value.includes(normalizedSearch));
 
-    const navItems = [
-      ...filteredGroups.map((group) => ({id: slugify(group.title), title: group.title, count: group.visibleFields.length})),
-      ...(pluginSectionVisible ? [{id: 'plugins', title: 'Plugins', count: 2}] : []),
-      ...(keymapsSectionVisible ? [{id: 'keymaps', title: 'Keymaps', count: 1}] : [])
-    ];
-
-    const scrollToSection = (id: string) => {
-      document.getElementById(id)?.scrollIntoView({behavior: 'smooth', block: 'start'});
-    };
-
     return (
-      <div className="visual_shell">
-        <aside className="settings_sidebar">
-          <div className="settings_sidebar_header">
-            <span className="sidebar_title">Settings</span>
-            <span className="sidebar_meta">{navItems.length} groups</span>
-          </div>
-          <div className="settings_sidebar_list">
-            {navItems.map((item) => (
-              <button type="button" className="sidebar_item" key={item.id} onClick={() => scrollToSection(item.id)}>
-                <span>{item.title}</span>
-                <span className="sidebar_badge">{item.count}</span>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <div className="visual_editor">
-          <section className="settings_search_panel">
-            <div className="settings_search_copy">
-              <h2>Search settings</h2>
-              <p>Filter the visual editor the way VS Code does: by setting name, group, or description.</p>
-            </div>
-            <div className="settings_search_bar">
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search settings"
-              />
-              {searchTerm ? (
-                <button type="button" className="secondary small" onClick={() => setSearchTerm('')}>
-                  Clear
-                </button>
-              ) : null}
-            </div>
-          </section>
-
-          {filteredGroups.map((group) => (
-            <section className="settings_section" key={group.title} id={slugify(group.title)}>
-              <div className="section_heading">
-                <div className="section_heading_copy">
-                  <h3>{group.title}</h3>
-                  <p>{group.description}</p>
-                </div>
-              </div>
-              <div className="grid">
-                {group.visibleFields.map((field) => renderField(configSchema.properties?.[field], ['config', field], humanizeLabel(field)))}
-              </div>
-            </section>
-          ))}
-
-          {pluginSectionVisible ? (
-            <section className="settings_section" id="plugins">
-              <div className="section_heading">
-                <div className="section_heading_copy">
-                  <h3>Plugins</h3>
-                  <p>Manage npm plugins and local plugin folders that extend hyper-revamp.</p>
-                </div>
-              </div>
-              <div className="grid">
-                {renderField(schemaRoot?.properties?.plugins, ['plugins'], 'Plugins')}
-                {renderField(schemaRoot?.properties?.localPlugins, ['localPlugins'], 'Local Plugins')}
-              </div>
-            </section>
-          ) : null}
-
-          {keymapsSectionVisible ? (
-            <section className="settings_section" id="keymaps">
-              <div className="section_heading">
-                <div className="section_heading_copy">
-                  <h3>Keymaps</h3>
-                  <p>Override keyboard shortcuts with one or more bindings per command.</p>
-                </div>
-              </div>
-              <div className="grid">{renderField(schemaRoot?.properties?.keymaps, ['keymaps'], 'Keyboard Shortcuts')}</div>
-            </section>
+      <div className="visual_editor">
+        <div className="settings_search_bar">
+          <svg className="search_icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search settings..."
+          />
+          {searchTerm ? (
+            <button type="button" className="search_clear" onClick={() => setSearchTerm('')}>
+              &times;
+            </button>
           ) : null}
         </div>
+
+        {filteredGroups.map((group) => (
+          <section className="settings_section" key={group.title} id={slugify(group.title)}>
+            <div className="section_header">
+              <h3 className="section_title">{group.title}</h3>
+              <p className="section_desc">{group.description}</p>
+            </div>
+            <div className="section_card">
+              {group.visibleFields.map((field) => renderField(configSchema.properties?.[field], ['config', field], humanizeLabel(field)))}
+            </div>
+          </section>
+        ))}
+
+        {profilesSectionVisible ? (() => {
+          const profiles: Array<{name: string; config: Record<string, unknown>}> = (draftObject as any).config?.profiles || [];
+          const activeProfile = profiles[activeProfileIndex] || profiles[0];
+          const profileConfigSchema = configSchema;
+
+          const addProfile = () => {
+            const name = `Profile ${profiles.length + 1}`;
+            updateDraft(['config', 'profiles'], [...profiles, {name, config: {}}]);
+            setActiveProfileIndex(profiles.length);
+          };
+
+          const deleteProfile = (index: number) => {
+            if (profiles.length <= 1) return;
+            const next = profiles.filter((_, i) => i !== index);
+            updateDraft(['config', 'profiles'], next);
+            setActiveProfileIndex(Math.min(activeProfileIndex, next.length - 1));
+          };
+
+          const renameProfile = (index: number, name: string) => {
+            updateDraft(['config', 'profiles', index, 'name'], name);
+          };
+
+          return (
+            <section className="settings_section" id="profiles">
+              <div className="section_header">
+                <h3 className="section_title">Profiles</h3>
+                <p className="section_desc">Create named profiles to quickly switch between different terminal configurations.</p>
+              </div>
+              <div className="profile_editor">
+                <div className="profile_sidebar">
+                  <div className="profile_list">
+                    {profiles.map((profile, index) => (
+                      <button
+                        type="button"
+                        key={index}
+                        className={`profile_item ${index === activeProfileIndex ? 'active' : ''}`}
+                        onClick={() => setActiveProfileIndex(index)}
+                      >
+                        <span className="profile_name">{profile.name || `Profile ${index + 1}`}</span>
+                        {(draftObject as any).config?.defaultProfile === profile.name ? (
+                          <span className="profile_badge">default</span>
+                        ) : null}
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" className="profile_add_btn" onClick={addProfile}>
+                    + New Profile
+                  </button>
+                </div>
+                {activeProfile ? (
+                  <div className="profile_detail">
+                    <div className="profile_detail_header">
+                      <div className="profile_name_field">
+                        <label className="profile_field_label">Profile Name</label>
+                        <input
+                          type="text"
+                          value={activeProfile.name}
+                          onChange={(e) => renameProfile(activeProfileIndex, e.target.value)}
+                        />
+                      </div>
+                      <div className="profile_actions">
+                        {profiles.length > 1 ? (
+                          <button type="button" className="btn_destructive" onClick={() => deleteProfile(activeProfileIndex)}>
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <p className="profile_detail_hint">Only set values you want to override. Unset fields inherit from the root config above.</p>
+                    <div className="profile_fields">
+                      {profileFields.map((field) => {
+                        const fieldSchema = profileConfigSchema?.properties?.[field];
+                        if (!fieldSchema) return null;
+                        return renderField(fieldSchema, ['config', 'profiles', activeProfileIndex, 'config', field], humanizeLabel(field));
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+          );
+        })() : null}
+
+        {pluginSectionVisible ? (
+          <section className="settings_section" id="plugins">
+            <div className="section_header">
+              <h3 className="section_title">Plugins</h3>
+              <p className="section_desc">Manage npm plugins and local plugin folders that extend hyper-revamp.</p>
+            </div>
+            <div className="section_card">
+              {renderField(schemaRoot?.properties?.plugins, ['plugins'], 'Plugins')}
+              {renderField(schemaRoot?.properties?.localPlugins, ['localPlugins'], 'Local Plugins')}
+            </div>
+          </section>
+        ) : null}
+
+        {keymapsSectionVisible ? (
+          <section className="settings_section" id="keymaps">
+            <div className="section_header">
+              <h3 className="section_title">Keymaps</h3>
+              <p className="section_desc">Override keyboard shortcuts with one or more bindings per command.</p>
+            </div>
+            <div className="section_card">
+              {renderField(schemaRoot?.properties?.keymaps, ['keymaps'], 'Keyboard Shortcuts')}
+            </div>
+          </section>
+        ) : null}
       </div>
     );
   };
@@ -984,27 +1053,26 @@ const SettingsApp = () => {
   return (
     <div className="settings_root">
       <header className="settings_header">
-        <div>
-          <p className="eyebrow">hyper-revamp settings</p>
-          <h1>Preferences</h1>
+        <div className="header_left">
+          <h1>Settings</h1>
           <p className="header_copy">{payload.configPath}</p>
         </div>
         <div className="toolbar">
-          <button type="button" className="secondary" onClick={() => void load()}>
-            Reload From Disk
+          <button type="button" className="btn_outline" onClick={() => void load()}>
+            Reload
           </button>
-          <button type="button" className="primary" disabled={!dirty || saving} onClick={() => void save()}>
-            {saving ? 'Saving…' : 'Save Changes'}
+          <button type="button" className="btn_primary" disabled={!dirty || saving} onClick={() => void save()}>
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </header>
 
       <div className="tabs">
         <button type="button" className={activeTab === 'visual' ? 'tab active' : 'tab'} onClick={() => switchToTab('visual')}>
-          Visual Editor
+          Visual
         </button>
         <button type="button" className={activeTab === 'text' ? 'tab active' : 'tab'} onClick={() => switchToTab('text')}>
-          Text Editor
+          JSON
         </button>
       </div>
 
@@ -1021,586 +1089,801 @@ const SettingsApp = () => {
           renderVisualEditor()
         ) : (
           <div className="text_editor_panel">
-            <div className="text_editor_meta">
-              <p>Edit the raw `hyper-revamp.json` file directly. Monaco validates against the built-in config schema.</p>
-            </div>
             <MonacoEditor value={textValue} schema={payload.schema} onChange={setTextValue} />
           </div>
         )}
       </main>
 
-      <style jsx>{`
+      <style jsx global>{`
+        /* ── shadcn/ui dark theme tokens ── */
         .settings_root {
+          --bg: #09090b;
+          --card: #18181b;
+          --foreground: #fafafa;
+          --muted: #27272a;
+          --muted-fg: #a1a1aa;
+          --border: #27272a;
+          --input: #27272a;
+          --ring: #d4d4d8;
+          --primary: #fafafa;
+          --primary-fg: #18181b;
+          --accent: #27272a;
+          --radius: 0.5rem;
+
           min-height: 100vh;
-          padding: 28px 28px 34px;
-          background:
-            radial-gradient(circle at top right, rgba(71, 116, 171, 0.22), transparent 30%),
-            linear-gradient(180deg, #111821 0%, #171f2a 100%);
-          color: #f3f7fb;
-          font-family: 'SF Pro Text', 'Helvetica Neue', sans-serif;
+          padding: 32px 32px 48px;
+          background: var(--bg);
+          color: var(--foreground);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+          font-size: 14px;
+          line-height: 1.5;
+          box-sizing: border-box;
         }
 
-        .loading {
+        .settings_root *,
+        .settings_root *::before,
+        .settings_root *::after {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+        }
+
+        .settings_root.loading {
           display: grid;
           place-items: center;
+          min-height: 100vh;
         }
 
-        .settings_header {
+        /* ── Header ── */
+        .settings_root .settings_header {
           display: flex;
           justify-content: space-between;
-          gap: 24px;
-          align-items: flex-start;
-          margin-bottom: 18px;
-        }
-
-        .eyebrow {
-          text-transform: uppercase;
-          letter-spacing: 0.18em;
-          color: #68f5ca;
-          font-size: 11px;
-          margin-bottom: 8px;
-        }
-
-        h1 {
-          font-size: 34px;
-          line-height: 1;
-          margin-bottom: 8px;
-          font-weight: 700;
-        }
-
-        .header_copy {
-          color: #9fb2c7;
-          font-size: 13px;
-          max-width: 760px;
-          font-family: 'SF Mono', Menlo, monospace;
-        }
-
-        .toolbar {
-          display: flex;
-          gap: 12px;
           align-items: center;
+          max-width: 680px;
+          margin: 0 auto 24px;
         }
 
-        .tabs {
-          display: inline-flex;
-          gap: 6px;
-          padding: 6px;
-          border-radius: 14px;
-          background: rgba(18, 27, 38, 0.96);
-          border: 1px solid rgba(131, 152, 176, 0.2);
-          margin-bottom: 22px;
-        }
-
-        .tab {
-          border-radius: 10px;
-          border: 0;
-          background: transparent;
-          color: #a9b9cc;
-          padding: 10px 14px;
-          font-size: 13px;
+        .settings_root h1 {
+          font-size: 24px;
           font-weight: 600;
-          cursor: pointer;
+          letter-spacing: -0.025em;
+          color: var(--foreground);
         }
 
-        .tab.active {
-          background: #edf3f9;
-          color: #18212c;
-        }
-
-        .settings_body {
-          display: grid;
-          gap: 20px;
-        }
-
-        .visual_shell {
-          display: grid;
-          grid-template-columns: 250px minmax(0, 1fr);
-          gap: 18px;
-          align-items: start;
-        }
-
-        .settings_sidebar {
-          position: sticky;
-          top: 16px;
-          border: 1px solid rgba(143, 161, 184, 0.16);
-          border-radius: 14px;
-          background: rgba(242, 246, 250, 0.96);
-          box-shadow: 0 8px 24px rgba(5, 11, 18, 0.14);
-          overflow: hidden;
-        }
-
-        .settings_sidebar_header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 14px 14px 12px;
-          border-bottom: 1px solid #d9e3ec;
-          background: #ffffff;
-        }
-
-        .sidebar_title {
+        .settings_root .header_copy {
+          color: var(--muted-fg);
           font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #4f6276;
+          font-family: 'SF Mono', Menlo, 'Cascadia Code', monospace;
+          margin-top: 2px;
         }
 
-        .sidebar_meta {
-          font-size: 11px;
-          color: #6a7c90;
-        }
-
-        .settings_sidebar_list {
-          display: grid;
-          gap: 2px;
-          padding: 8px;
-        }
-
-        .sidebar_item {
+        .settings_root .toolbar {
           display: flex;
-          justify-content: space-between;
+          gap: 8px;
           align-items: center;
-          gap: 12px;
-          width: 100%;
-          padding: 10px 12px;
-          border-radius: 10px;
-          border: 0;
-          background: transparent;
-          color: #213042;
-          text-align: left;
-          cursor: pointer;
         }
 
-        .sidebar_item:hover {
-          background: #eaf1f8;
-        }
-
-        .sidebar_badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          min-width: 24px;
-          height: 24px;
-          padding: 0 8px;
-          border-radius: 999px;
-          background: #dbe7f3;
-          color: #335a85;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .visual_editor {
-          display: grid;
-          gap: 22px;
-          max-width: 1480px;
-        }
-
-        .settings_search_panel,
-        .settings_section,
-        .text_editor_panel {
-          scroll-margin-top: 18px;
-        }
-
-        .settings_search_panel {
-          display: grid;
-          gap: 14px;
-          padding: 18px 20px;
-          border: 1px solid rgba(143, 161, 184, 0.16);
-          border-radius: 14px;
-          background: rgba(244, 248, 252, 0.98);
-          box-shadow: 0 12px 30px rgba(4, 10, 19, 0.12);
-        }
-
-        .settings_search_copy h2 {
-          font-size: 18px;
-          color: #1e2b39;
-          margin-bottom: 4px;
-        }
-
-        .settings_search_copy p {
-          color: #64778a;
-          font-size: 13px;
-          line-height: 1.5;
-        }
-
-        .settings_search_bar {
+        /* ── Tabs ── */
+        .settings_root .tabs {
           display: flex;
-          gap: 10px;
-          align-items: center;
-        }
-
-        .settings_search_bar input {
-          flex: 1;
-          background: #ffffff;
-        }
-
-        .settings_section,
-        .text_editor_panel {
-          border: 1px solid rgba(143, 161, 184, 0.16);
-          border-radius: 18px;
-          background: rgba(244, 248, 252, 0.98);
-          box-shadow: 0 14px 40px rgba(4, 10, 19, 0.22);
-          overflow: hidden;
-        }
-
-        .section_heading,
-        .text_editor_meta {
-          padding: 22px 24px 18px;
-          border-bottom: 1px solid rgba(145, 164, 188, 0.18);
-          background: linear-gradient(180deg, #f8fbfe 0%, #eff4f9 100%);
-        }
-
-        .section_heading_copy {
-          display: grid;
-          gap: 6px;
-          max-width: 820px;
-        }
-
-        .section_heading h3 {
-          font-size: 18px;
-          letter-spacing: -0.01em;
-          color: #1f2d3b;
-        }
-
-        .section_heading p {
-          color: #617386;
-          font-size: 14px;
-          line-height: 1.6;
-        }
-
-        .text_editor_meta p {
-          color: #607183;
-          font-size: 14px;
-        }
-
-        .grid {
-          display: grid;
-          gap: 16px;
-          grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-          padding: 22px 24px 26px;
-        }
-
-        .field {
-          display: grid;
-          gap: 12px;
-          padding: 18px;
-          border-radius: 12px;
-          background: #ffffff;
-          border: 1px solid #d9e2ec;
-          border-left: 3px solid transparent;
-          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
-          transition:
-            border-color 140ms ease,
-            box-shadow 140ms ease,
-            transform 140ms ease;
-        }
-
-        .field:hover {
-          border-color: #bfd1e2;
-          border-left-color: #2f6fcb;
-          box-shadow: 0 10px 20px rgba(28, 45, 68, 0.05);
-        }
-
-        .field.inline {
-          gap: 14px;
-          align-content: start;
-        }
-
-        .field_head {
-          display: flex;
-          justify-content: space-between;
-          gap: 14px;
-          align-items: center;
-        }
-
-        .field_meta {
-          display: grid;
+          width: fit-content;
           gap: 4px;
-        }
-
-        .field_label {
-          font-size: 15px;
-          font-weight: 700;
-          color: #17212d;
-        }
-
-        .field_description {
-          font-size: 12px;
-          line-height: 1.5;
-          color: #5e7083;
-          white-space: pre-wrap;
-        }
-
-        .field_control {
-          display: grid;
-          gap: 10px;
-        }
-
-        .field.inline .field_control {
-          justify-items: start;
-        }
-
-        .stack {
-          display: grid;
-          gap: 10px;
-          width: 100%;
-        }
-
-        .pair,
-        .list_item,
-        .two_col,
-        .string_field {
-          display: grid;
-          gap: 10px;
-        }
-
-        .pair {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
-          align-items: center;
-        }
-
-        .two_col {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .list_item {
-          grid-template-columns: minmax(0, 1fr) auto;
-          align-items: start;
-        }
-
-        .list_item_body {
-          min-width: 0;
-        }
-
-        .nested_card {
-          display: grid;
-          gap: 14px;
-          width: 100%;
-          padding: 8px 0 2px;
-        }
-
-        .nested_card_header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: 16px;
-          padding: 0 4px;
-        }
-
-        .nested_card_header h4 {
-          font-size: 14px;
-          margin-bottom: 4px;
-          color: #17212d;
-        }
-
-        .nested_card_header p {
-          font-size: 12px;
-          color: #5e7083;
-          line-height: 1.5;
-          white-space: pre-wrap;
-        }
-
-        input,
-        textarea,
-        select,
-        button {
-          font: inherit;
-        }
-
-        input[type='text'],
-        input[type='number'],
-        textarea,
-        select {
-          width: 100%;
-          border: 1px solid #c7d3df;
-          background: #f8fbfd;
-          color: #16202a;
-          border-radius: 10px;
-          padding: 12px 14px;
-          outline: none;
-          font-family: 'SF Mono', Menlo, monospace;
-        }
-
-        input[type='text']:focus,
-        input[type='number']:focus,
-        textarea:focus,
-        select:focus {
-          border-color: #4f7ec4;
-          box-shadow: 0 0 0 3px rgba(79, 126, 196, 0.14);
-          background: #ffffff;
-        }
-
-        textarea {
-          resize: vertical;
-          min-height: 120px;
-        }
-
-        input[type='checkbox'] {
-          width: 18px;
-          height: 18px;
-          accent-color: #3568b5;
-        }
-
-        input[type='color'] {
-          width: 48px;
-          min-width: 48px;
-          height: 48px;
           padding: 4px;
-          border-radius: 10px;
-          border: 1px solid #c7d3df;
-          background: #f8fbfd;
+          border-radius: var(--radius);
+          background: var(--muted);
+          border: none;
+          margin: 0 auto 24px;
         }
 
-        .primary,
-        .secondary {
-          border: 0;
+        .settings_root .tab {
+          border-radius: calc(var(--radius) - 2px);
+          border: none;
+          background: transparent;
+          color: var(--muted-fg);
+          padding: 6px 16px;
+          font-size: 14px;
+          font-weight: 500;
           cursor: pointer;
-          padding: 12px 18px;
-          border-radius: 12px;
-          font-weight: 650;
+          transition: all 150ms;
         }
 
-        .small {
-          padding: 8px 12px;
-          font-size: 12px;
+        .settings_root .tab:hover {
+          color: var(--foreground);
         }
 
-        .primary {
-          background: linear-gradient(180deg, #2f6fcb 0%, #255eb2 100%);
-          color: #ffffff;
+        .settings_root .tab.active {
+          background: var(--bg);
+          color: var(--foreground);
+          box-shadow: 0 1px 2px rgba(0,0,0,0.4);
         }
 
-        .primary:disabled {
-          opacity: 0.55;
-          cursor: default;
-        }
-
-        .secondary {
-          background: #f7f9fb;
-          color: #223142;
-          border: 1px solid #c9d5e1;
-        }
-
-        .ghost {
-          background: #ffffff;
-        }
-
-        .banner {
-          margin-bottom: 14px;
-          border-radius: 12px;
-          padding: 13px 16px;
-          font-size: 13px;
-        }
-
-        .success {
-          background: #eef9f2;
-          border: 1px solid #bddfc6;
-          color: #285f38;
-        }
-
-        .error {
-          background: #fff1f1;
-          border: 1px solid #efc1c1;
-          color: #842f2f;
-        }
-
-        .warning {
-          background: #fff7e8;
-          border: 1px solid #e8d39d;
-          color: #7a5b1a;
-        }
-
-        .monaco_shell {
-          position: relative;
-        }
-
-        .monaco_editor {
-          height: calc(100vh - 264px);
-          min-height: 520px;
-        }
-
-        .monaco_editor.hidden {
-          display: none;
-        }
-
-        .monaco_editor.ready {
+        .settings_root .settings_body {
           display: block;
         }
 
-        .monaco_fallback {
+        /* ── Visual editor ── */
+        .settings_root .visual_editor {
+          max-width: 680px;
+          margin: 0 auto;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 28px;
+        }
+
+        /* ── Search ── */
+        .settings_root .settings_search_bar {
+          position: relative;
+        }
+
+        .settings_root .search_icon {
+          position: absolute;
+          left: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--muted-fg);
+          pointer-events: none;
+        }
+
+        .settings_root .settings_search_bar input[type='text'] {
+          width: 100%;
+          padding: 9px 36px 9px 38px;
+          background: var(--bg);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          color: var(--foreground);
+          font-size: 14px;
+          font-family: inherit;
+        }
+
+        .settings_root .settings_search_bar input[type='text']::placeholder {
+          color: var(--muted-fg);
+        }
+
+        .settings_root .settings_search_bar input[type='text']:focus {
+          border-color: var(--ring);
+          box-shadow: 0 0 0 2px rgba(212, 212, 216, 0.15);
+        }
+
+        .settings_root .search_clear {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: var(--muted-fg);
+          font-size: 16px;
+          cursor: pointer;
+          padding: 2px 6px;
+          line-height: 1;
+          border-radius: 4px;
+        }
+
+        .settings_root .search_clear:hover {
+          color: var(--foreground);
+          background: var(--accent);
+        }
+
+        /* ── Sections ── */
+        .settings_root .settings_section {
+          scroll-margin-top: 24px;
+        }
+
+        .settings_root .section_header {
+          margin-bottom: 12px;
+        }
+
+        .settings_root .section_title {
+          font-size: 18px;
+          font-weight: 600;
+          letter-spacing: -0.015em;
+          color: var(--foreground);
+        }
+
+        .settings_root .section_desc {
+          font-size: 14px;
+          color: var(--muted-fg);
+          margin-top: 4px;
+        }
+
+        .settings_root .section_card {
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          background: var(--card);
+          padding: 0 24px;
+        }
+
+        /* ── Text editor ── */
+        .settings_root .text_editor_panel {
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          background: var(--card);
+          overflow: hidden;
+          max-width: 680px;
+          margin: 0 auto;
+          width: 100%;
+        }
+
+        /* ── Fields ── */
+        .settings_root .field {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 20px 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .settings_root .field:last-child {
+          border-bottom: none;
+        }
+
+        .settings_root .field.inline {
+          flex-direction: row;
+          flex-wrap: wrap;
+          align-items: flex-start;
+          gap: 10px 14px;
+        }
+
+        .settings_root .field.inline .field_control {
+          order: -1;
+          padding-top: 3px;
+        }
+
+        .settings_root .field.inline .field_head {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .settings_root .field_head {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+        }
+
+        .settings_root .field_meta {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .settings_root .field_id {
+          font-family: 'SF Mono', Menlo, 'Cascadia Code', monospace;
+          font-size: 11px;
+          color: var(--muted-fg);
+          opacity: 0.7;
+          display: block;
+        }
+
+        .settings_root .field_label {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--foreground);
+          display: block;
+        }
+
+        .settings_root .field_description {
+          font-size: 13px;
+          line-height: 1.6;
+          color: var(--muted-fg);
+          white-space: pre-wrap;
+          display: block;
+        }
+
+        .settings_root .field_control {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .settings_root .reset_btn {
+          background: none;
+          border: none;
+          color: var(--muted-fg);
+          font-size: 12px;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 4px;
+          white-space: nowrap;
+          transition: all 150ms;
+        }
+
+        .settings_root .reset_btn:hover {
+          color: var(--foreground);
+          background: var(--accent);
+        }
+
+        /* ── Layout helpers ── */
+        .settings_root .stack {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          width: 100%;
+        }
+
+        .settings_root .pair {
           display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .settings_root .two_col {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .settings_root .list_item {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: start;
+          gap: 8px;
+        }
+
+        .settings_root .list_item_body {
+          min-width: 0;
+        }
+
+        .settings_root .string_field {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .settings_root .nested_card {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          width: 100%;
+          padding: 4px 0;
+        }
+
+        .settings_root .nested_card_header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .settings_root .nested_card_header h4 {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--foreground);
+          margin-bottom: 2px;
+        }
+
+        .settings_root .nested_card_header p {
+          font-size: 13px;
+          color: var(--muted-fg);
+          line-height: 1.5;
+          white-space: pre-wrap;
+        }
+
+        /* ── Form controls ── */
+        .settings_root input,
+        .settings_root textarea,
+        .settings_root select,
+        .settings_root button {
+          font: inherit;
+        }
+
+        .settings_root input[type='text'],
+        .settings_root input[type='number'],
+        .settings_root textarea,
+        .settings_root select {
+          width: 100%;
+          border: 1px solid var(--input);
+          background: var(--bg);
+          color: var(--foreground);
+          border-radius: calc(var(--radius) - 2px);
+          padding: 8px 12px;
+          outline: none;
+          font-family: 'SF Mono', Menlo, 'Cascadia Code', monospace;
+          font-size: 13px;
+          transition: border-color 150ms, box-shadow 150ms;
+        }
+
+        .settings_root input[type='text']:focus,
+        .settings_root input[type='number']:focus,
+        .settings_root textarea:focus,
+        .settings_root select:focus {
+          border-color: var(--ring);
+          box-shadow: 0 0 0 2px rgba(212, 212, 216, 0.15);
+        }
+
+        .settings_root select {
+          cursor: pointer;
+        }
+
+        .settings_root textarea {
+          resize: vertical;
+          min-height: 100px;
+        }
+
+        .settings_root input[type='checkbox'] {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 16px;
+          height: 16px;
+          border: 1px solid var(--input);
+          border-radius: 4px;
+          background: transparent;
+          cursor: pointer;
+          position: relative;
+          transition: all 150ms;
+          flex-shrink: 0;
+        }
+
+        .settings_root input[type='checkbox']:checked {
+          background: var(--primary);
+          border-color: var(--primary);
+        }
+
+        .settings_root input[type='checkbox']:checked::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 1px;
+          width: 5px;
+          height: 9px;
+          border: solid var(--primary-fg);
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+
+        .settings_root input[type='checkbox']:focus-visible {
+          box-shadow: 0 0 0 2px rgba(212, 212, 216, 0.15);
+        }
+
+        .settings_root input[type='color'] {
+          width: 40px;
+          min-width: 40px;
+          height: 40px;
+          padding: 3px;
+          border-radius: calc(var(--radius) - 2px);
+          border: 1px solid var(--input);
+          background: transparent;
+          cursor: pointer;
+        }
+
+        /* ── Buttons ── */
+        .settings_root .btn_primary,
+        .settings_root .btn_outline {
+          border: none;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 14px;
+          border-radius: calc(var(--radius) - 2px);
+          transition: all 150ms;
+          padding: 8px 16px;
+        }
+
+        .settings_root .btn_primary {
+          background: var(--primary);
+          color: var(--primary-fg);
+        }
+
+        .settings_root .btn_primary:hover {
+          opacity: 0.9;
+        }
+
+        .settings_root .btn_primary:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
+
+        .settings_root .btn_outline {
+          background: transparent;
+          color: var(--foreground);
+          border: 1px solid var(--border);
+        }
+
+        .settings_root .btn_outline:hover {
+          background: var(--accent);
+        }
+
+        .settings_root .secondary {
+          border: 1px solid var(--border);
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 13px;
+          border-radius: calc(var(--radius) - 2px);
+          transition: all 150ms;
+          padding: 6px 12px;
+          background: transparent;
+          color: var(--foreground);
+        }
+
+        .settings_root .secondary:hover {
+          background: var(--accent);
+        }
+
+        .settings_root .small {
+          padding: 5px 10px;
+          font-size: 12px;
+        }
+
+        /* ── Banners ── */
+        .settings_root .banner {
+          margin-bottom: 16px;
+          border-radius: calc(var(--radius) - 2px);
+          padding: 12px 16px;
+          font-size: 14px;
+          max-width: 680px;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .settings_root .banner.success {
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.25);
+          color: #4ade80;
+        }
+
+        .settings_root .banner.error {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.25);
+          color: #f87171;
+        }
+
+        .settings_root .banner.warning {
+          background: rgba(234, 179, 8, 0.1);
+          border: 1px solid rgba(234, 179, 8, 0.25);
+          color: #facc15;
+        }
+
+        /* ── Monaco ── */
+        .settings_root .monaco_shell {
+          position: relative;
+        }
+
+        .settings_root .monaco_editor {
+          height: calc(100vh - 220px);
+          min-height: 520px;
+        }
+
+        .settings_root .monaco_editor.hidden {
+          display: none;
+        }
+
+        .settings_root .monaco_editor.ready {
+          display: block;
+        }
+
+        .settings_root .monaco_fallback {
+          display: flex;
+          flex-direction: column;
           gap: 10px;
           padding: 16px 20px 20px;
         }
 
-        .text_fallback {
+        .settings_root .text_fallback {
           min-height: 520px;
           resize: vertical;
         }
 
-        .monaco_status,
-        .monaco_error p {
-          color: #53677a;
+        .settings_root .monaco_status,
+        .settings_root .monaco_error p {
+          color: var(--muted-fg);
           font-size: 13px;
         }
 
-        .monaco_error {
-          display: grid;
+        .settings_root .monaco_error {
+          display: flex;
+          flex-direction: column;
           gap: 6px;
           padding: 12px 14px;
-          border-radius: 10px;
-          background: #fff5f5;
-          border: 1px solid #efc8c8;
+          border-radius: calc(var(--radius) - 2px);
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.25);
         }
 
-        .monaco_error_detail {
-          font-family: 'SF Mono', Menlo, monospace;
+        .settings_root .monaco_error_detail {
+          font-family: 'SF Mono', Menlo, 'Cascadia Code', monospace;
           font-size: 12px;
-          color: #8d3d3d;
+          color: #f87171;
         }
 
-        @media (max-width: 920px) {
+        /* ── Profile editor ── */
+        .settings_root .profile_editor {
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          background: var(--card);
+          display: grid;
+          grid-template-columns: 200px minmax(0, 1fr);
+          min-height: 400px;
+          overflow: hidden;
+        }
+
+        .settings_root .profile_sidebar {
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          background: var(--bg);
+        }
+
+        .settings_root .profile_list {
+          flex: 1;
+          overflow-y: auto;
+          padding: 8px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .settings_root .profile_item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          width: 100%;
+          padding: 8px 12px;
+          border-radius: calc(var(--radius) - 2px);
+          border: none;
+          background: transparent;
+          color: var(--muted-fg);
+          text-align: left;
+          cursor: pointer;
+          font-size: 13px;
+          transition: all 100ms;
+        }
+
+        .settings_root .profile_item:hover {
+          background: var(--accent);
+          color: var(--foreground);
+        }
+
+        .settings_root .profile_item.active {
+          background: var(--accent);
+          color: var(--foreground);
+          font-weight: 500;
+        }
+
+        .settings_root .profile_name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .settings_root .profile_badge {
+          font-size: 10px;
+          padding: 1px 6px;
+          border-radius: 999px;
+          background: var(--muted);
+          color: var(--muted-fg);
+          flex-shrink: 0;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+        }
+
+        .settings_root .profile_add_btn {
+          margin: 8px;
+          padding: 8px 12px;
+          border-radius: calc(var(--radius) - 2px);
+          border: 1px dashed var(--border);
+          background: transparent;
+          color: var(--muted-fg);
+          cursor: pointer;
+          font-size: 13px;
+          transition: all 150ms;
+        }
+
+        .settings_root .profile_add_btn:hover {
+          background: var(--accent);
+          color: var(--foreground);
+          border-color: var(--muted-fg);
+        }
+
+        .settings_root .profile_detail {
+          padding: 20px 24px;
+          overflow-y: auto;
+          max-height: 600px;
+        }
+
+        .settings_root .profile_detail_header {
+          display: flex;
+          align-items: flex-end;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .settings_root .profile_name_field {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .settings_root .profile_field_label {
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--muted-fg);
+        }
+
+        .settings_root .profile_actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .settings_root .btn_destructive {
+          padding: 8px 14px;
+          border-radius: calc(var(--radius) - 2px);
+          border: 1px solid rgba(239, 68, 68, 0.3);
+          background: rgba(239, 68, 68, 0.1);
+          color: #f87171;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          transition: all 150ms;
+        }
+
+        .settings_root .btn_destructive:hover {
+          background: rgba(239, 68, 68, 0.2);
+          border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        .settings_root .profile_detail_hint {
+          font-size: 13px;
+          color: var(--muted-fg);
+          margin-bottom: 16px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .settings_root .profile_fields {
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 820px) {
           .settings_root {
-            padding: 20px;
+            padding: 20px 16px;
           }
 
-          .visual_shell {
-            grid-template-columns: 1fr;
+          .settings_root .settings_header {
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
           }
 
-          .settings_sidebar {
-            position: static;
-          }
-
-          .settings_header {
-            grid-template-columns: 1fr;
-            display: grid;
-          }
-
-          .toolbar,
-          .tabs {
+          .settings_root .toolbar {
             width: 100%;
           }
 
-          .toolbar {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
+          .settings_root .toolbar .btn_primary,
+          .settings_root .toolbar .btn_outline {
+            flex: 1;
           }
 
-          .settings_search_bar {
-            grid-template-columns: 1fr;
-            display: grid;
-          }
-
-          .two_col,
-          .pair,
-          .list_item {
+          .settings_root .two_col,
+          .settings_root .pair,
+          .settings_root .list_item {
             grid-template-columns: 1fr;
           }
 
-          .monaco_editor {
-            height: calc(100vh - 320px);
+          .settings_root .section_card {
+            padding: 0 14px;
+          }
+
+          .settings_root .monaco_editor {
+            height: calc(100vh - 280px);
+          }
+
+          .settings_root .profile_editor {
+            grid-template-columns: 1fr;
+          }
+
+          .settings_root .profile_sidebar {
+            border-right: none;
+            border-bottom: 1px solid var(--border);
+          }
+
+          .settings_root .profile_list {
+            flex-direction: row;
+            overflow-x: auto;
           }
         }
       `}</style>

@@ -2,7 +2,7 @@
   "$schema": "./schema.json",
   "config": {
     "updateChannel": "stable",
-    "fontSize": 12,
+    "fontSize": 14,
     "fontFamily": "\"Cascadia Code\", Menlo, \"DejaVu Sans Mono\", Consolas, \"Lucida Console\", monospace",
     "fontWeight": "normal",
     "fontWeightBold": "bold",
@@ -58,7 +58,8 @@
     "macOptionSelectionMode": "vertical",
     "webGLRenderer": false,
     "webLinksActivationKey": "",
-    "disableLigatures": true,
+    "opacity": 0.95,
+    "disableLigatures": false,
     "disableAutoUpdates": false,
     "autoUpdatePlugins": false,
     "preserveCWD": true,

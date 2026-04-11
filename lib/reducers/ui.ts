@@ -47,7 +47,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   cursorBlink: false,
   borderColor: '#333',
   selectionColor: 'rgba(248,28,229,0.3)',
-  fontSize: 12,
+  fontSize: 14,
   padding: '12px 14px',
   fontFamily: '"Cascadia Code", Menlo, "DejaVu Sans Mono", "Lucida Console", monospace',
   uiFontFamily:
@@ -114,7 +114,7 @@ const initial: uiState = Immutable<Mutable<uiState>>({
   webGLRenderer: true,
   webLinksActivationKey: '',
   macOptionSelectionMode: 'vertical',
-  disableLigatures: true,
+  disableLigatures: false,
   screenReaderMode: false,
   defaultProfile: '',
   profiles: []

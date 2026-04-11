@@ -28,14 +28,18 @@ trap cleanup EXIT
 
 cd "$ROOT_DIR"
 
-if [[ ! -d node_modules ]]; then
-  echo "node_modules is missing. Run 'yarn install' first."
-  exit 1
-fi
-
-if [[ ! -d target/node_modules ]]; then
-  echo "target/node_modules is missing. Run 'yarn install' first so postinstall can prepare the app bundle."
-  exit 1
+if [[ ! -d node_modules ]] || [[ ! -d target/node_modules ]]; then
+  echo "==> Installing dependencies"
+  yarn install --ignore-engines --ignore-scripts
+  echo "==> Running postinstall steps"
+  node node_modules/electron/install.js
+  npx webpack --config-name hyper-app
+  npx electron-builder install-app-deps
+  yarn run rebuild-node-pty
+  npx cpy --cwd=target node_modules "../../app/"
+  if ! yarn run generate-schema 2>/dev/null; then
+    echo "warning: generate-schema failed; using existing schema"
+  fi
 fi
 
 if [[ ! -d "$APP_TEMPLATE" ]]; then
@@ -51,7 +55,7 @@ fi
 if [[ -f "$HOME/.nvm/nvm.sh" ]]; then
   # shellcheck disable=SC1090
   source "$HOME/.nvm/nvm.sh"
-  nvm use 20 >/dev/null
+  nvm use 20 >/dev/null 2>&1 || true
 fi
 
 APP_VERSION="$(node -p "require('./package.json').version")"
