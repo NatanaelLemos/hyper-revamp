@@ -17,6 +17,10 @@ export const CommandPalette: React.FC = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const navigatedRef = useRef(false);
   const stateRef = useRef({open: false, query: '/', selectedIndex: 0, itemCount: 0});
+  // Approximate column position on the current shell line. We can't read the
+  // shell's state directly, so we track keystrokes since the last Enter/clear.
+  // 0 means we believe the cursor is at the start of a fresh prompt line.
+  const lineColRef = useRef(0);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -92,15 +96,34 @@ export const CommandPalette: React.FC = () => {
 
       const s = stateRef.current;
 
-      // Start the palette when the user types `/` plain.
+      // Start the palette when the user types `/` plain at the start of a line.
       if (!s.open) {
-        if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (
+          e.key === '/' &&
+          !e.metaKey &&
+          !e.ctrlKey &&
+          !e.altKey &&
+          lineColRef.current === 0
+        ) {
           // Don't preventDefault — let the shell receive the `/` so it appears
           // on the prompt line as the user types.
           setOpen(true);
           setQuery('/');
           setSelectedIndex(0);
           navigatedRef.current = false;
+          lineColRef.current += 1;
+          return;
+        }
+        // Track line position for the non-palette case.
+        if (e.key === 'Enter') {
+          lineColRef.current = 0;
+        } else if (e.key === 'Backspace') {
+          lineColRef.current = Math.max(0, lineColRef.current - 1);
+        } else if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'c' || e.key === 'a' || e.key === 'l')) {
+          // Ctrl+U (clear line), Ctrl+C (abort), Ctrl+A (beginning of line), Ctrl+L (clear screen).
+          lineColRef.current = 0;
+        } else if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+          lineColRef.current += 1;
         }
         return;
       }
@@ -132,6 +155,7 @@ export const CommandPalette: React.FC = () => {
         return;
       }
       if (e.key === 'Enter') {
+        lineColRef.current = 0;
         // Run the selected command only if the user navigated OR the current
         // query unambiguously matches an item. Otherwise let Enter go to shell.
         if (navigatedRef.current && s.itemCount > 0) {
@@ -150,6 +174,7 @@ export const CommandPalette: React.FC = () => {
         return;
       }
       if (e.key === 'Backspace') {
+        lineColRef.current = Math.max(0, lineColRef.current - 1);
         if (s.query.length <= 1) {
           // Backspacing past the leading `/` → close the palette.
           close();
@@ -166,6 +191,7 @@ export const CommandPalette: React.FC = () => {
         setQuery((q) => q + e.key);
         setSelectedIndex(0);
         navigatedRef.current = false;
+        lineColRef.current += 1;
       }
     };
     window.addEventListener('keydown', onKey, true);
