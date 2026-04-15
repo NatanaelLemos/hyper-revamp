@@ -10,6 +10,8 @@ import {getRegisteredKeys, getCommandHandler, shouldPreventDefault} from '../com
 import type Terms from '../components/terms';
 import {connect} from '../utils/plugins';
 
+import CommandPalette from '../components/command-palette';
+
 import {HeaderContainer} from './header';
 import NotificationsContainer from './notifications';
 import TermsContainer from './terms';
@@ -91,13 +93,13 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
     };
   }, []);
 
-  const {isMac: isMac_, customCSS, uiFontFamily, borderColor, maximized, fullScreen} = props;
+  const {isMac: isMac_, customCSS, uiFontFamily, borderColor, backgroundColor, maximized, fullScreen} = props;
   const borderWidth = isMac_ ? '' : `${maximized ? '0' : '1'}px`;
   stylis.set({prefix: false});
   return (
     <div id="hyper" ref={ref}>
       <div
-        style={{fontFamily: uiFontFamily, borderColor, borderWidth}}
+        style={{fontFamily: uiFontFamily, borderColor, borderWidth, backgroundColor}}
         className={`hyper_main ${isMac_ && 'hyper_mainRounded'} ${fullScreen ? 'fullScreen' : ''}`}
       >
         <HeaderContainer />
@@ -106,6 +108,7 @@ const Hyper = forwardRef<HTMLDivElement, HyperProps>((props, ref) => {
       </div>
 
       <NotificationsContainer />
+      <CommandPalette />
 
       {props.customChildren}
 

@@ -1,11 +1,42 @@
-import React, {forwardRef} from 'react';
+import React, {forwardRef, useRef} from 'react';
 
 import type {TabProps} from '../../typings/hyper';
+import {ipcRenderer} from '../utils/ipc';
+
+const DRAG_THRESHOLD = 4; // pixels — anything smaller is treated as a click
 
 const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
+  const downPos = useRef<{sx: number; sy: number; wx: number; wy: number} | null>(null);
+  const didDrag = useRef(false);
+
+  const handleMouseDown = async (event: React.MouseEvent) => {
+    if (event.nativeEvent.which !== 1) return;
+    // Start tracking — if the mouse ends up moving, we'll drag the window
+    // instead of treating this as a click.
+    didDrag.current = false;
+    const [wx, wy] = (await ipcRenderer.invoke('window:get-position')) as [number, number];
+    downPos.current = {sx: event.screenX, sy: event.screenY, wx, wy};
+
+    const onMove = (e: MouseEvent) => {
+      if (!downPos.current) return;
+      const dx = e.screenX - downPos.current.sx;
+      const dy = e.screenY - downPos.current.sy;
+      if (!didDrag.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      didDrag.current = true;
+      ipcRenderer.send('window:set-position', downPos.current.wx + dx, downPos.current.wy + dy);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      downPos.current = null;
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   const handleClick = (event: React.MouseEvent) => {
     const isLeftClick = event.nativeEvent.which === 1;
-
+    if (didDrag.current) return; // this was a drag, not a click
     if (isLeftClick && !props.isActive) {
       props.onSelect();
     }
@@ -19,12 +50,13 @@ const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
     }
   };
 
-  const {isActive, isFirst, isLast, borderColor, hasActivity} = props;
+  const {isActive, isFirst, isLast, borderColor, hasActivity, accentColor} = props;
 
   return (
     <>
       <li
         onClick={props.onClick}
+        onMouseDown={handleMouseDown}
         style={{borderColor}}
         className={`tab_tab ${isFirst ? 'tab_first' : ''} ${isActive ? 'tab_active' : ''} ${
           isFirst && isActive ? 'tab_firstActive' : ''
@@ -32,6 +64,10 @@ const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
         ref={ref}
       >
         {props.customChildrenBefore}
+        {accentColor ? <span className="tab_accent" style={{background: accentColor}} /> : null}
+        <i className="tab_closeLeft" onClick={props.onClose} title="Close tab">
+          ×
+        </i>
         <span
           className={`tab_text ${isLast ? 'tab_textLast' : ''} ${isActive ? 'tab_textActive' : ''}`}
           onClick={handleClick}
@@ -41,11 +77,6 @@ const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
             {props.text}
           </span>
         </span>
-        <i className="tab_icon" onClick={props.onClose}>
-          <svg className="tab_shape">
-            <use xlinkHref="./renderer/assets/icons.svg#close-tab" />
-          </svg>
-        </i>
         {props.customChildren}
       </li>
 
@@ -60,6 +91,7 @@ const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
           list-style-type: none;
           flex-grow: 1;
           position: relative;
+          -webkit-app-region: no-drag;
         }
 
         .tab_tab:hover {
@@ -113,51 +145,42 @@ const Tab = forwardRef<HTMLLIElement, TabProps>((props, ref) => {
           overflow: hidden;
         }
 
-        .tab_icon {
-          transition:
-            opacity 0.2s ease,
-            color 0.2s ease,
-            transform 0.25s ease,
-            background-color 0.1s ease;
-          pointer-events: none;
+        .tab_closeLeft {
           position: absolute;
-          right: 7px;
+          left: 7px;
           top: 10px;
-          display: inline-block;
           width: 14px;
           height: 14px;
+          line-height: 14px;
+          text-align: center;
+          font-size: 14px;
+          font-style: normal;
           border-radius: 100%;
           color: #e9e9e9;
-          opacity: 0;
-          transform: scale(0.95);
+          cursor: pointer;
+          z-index: 1;
+          -webkit-app-region: no-drag;
         }
 
-        .tab_icon:hover {
+        .tab_closeLeft:hover {
           background-color: rgba(255, 255, 255, 0.13);
           color: #fff;
         }
 
-        .tab_icon:active {
+        .tab_closeLeft:active {
           background-color: rgba(255, 255, 255, 0.1);
           color: #909090;
         }
 
-        .tab_tab:hover .tab_icon {
-          opacity: 1;
-          transform: none;
-          pointer-events: all;
+        .tab_accent {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 2px;
+          pointer-events: none;
         }
 
-        .tab_shape {
-          position: absolute;
-          left: 4px;
-          top: 4px;
-          width: 6px;
-          height: 6px;
-          vertical-align: middle;
-          fill: currentColor;
-          shape-rendering: crispEdges;
-        }
       `}</style>
     </>
   );

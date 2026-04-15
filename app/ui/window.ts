@@ -12,7 +12,7 @@ import {v4 as uuidv4} from 'uuid';
 import type {sessionExtraOptions} from '../../typings/common';
 import type {configOptions} from '../../typings/config';
 import {execCommand} from '../commands';
-import {getDefaultProfile} from '../config';
+import {getDefaultProfile, getProfiles} from '../config';
 import {icon, homeDirectory} from '../config/paths';
 import fetchNotifications from '../notifications';
 import notify from '../notify';
@@ -25,6 +25,7 @@ import toElectronBackgroundColor from '../utils/to-electron-background-color';
 import {isSafeExternalUrl} from '../utils/url-safety';
 
 import contextMenuTemplate from './contextmenu';
+import {buildSshCommand} from './ssh-args';
 
 const clampOpacity = (value: unknown) => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
@@ -233,6 +234,24 @@ export function newWindow(
         uid
       }
     );
+
+    // For SSH profiles, override shell/shellArgs before plugin decoration so
+    // `decorateSessionOptions` sees the real ssh invocation. Raw profile has
+    // `type`/`ssh`; decorated profileCfg is flat configOptions and omits them.
+    const rawProfile = getProfiles().find((p) => p.name === profile);
+    if (rawProfile?.type === 'ssh' && rawProfile.ssh?.host && rawProfile.ssh?.user) {
+      const usePassword = rawProfile.ssh.authType === 'password' || !!rawProfile.ssh.password;
+      if (usePassword) {
+        // Use the embedded ssh2 client so password auth works cross-platform
+        // without requiring `sshpass`.
+        (defaultOptions as any).ssh2 = {...rawProfile.ssh, authType: 'password'};
+      } else {
+        const cmd = buildSshCommand(rawProfile.ssh);
+        defaultOptions.shell = cmd.shell;
+        defaultOptions.shellArgs = cmd.shellArgs;
+      }
+    }
+
     const options = decorateSessionOptions(defaultOptions);
     const DecoratedSession = decorateSessionClass(Session);
     const session = new DecoratedSession(options);

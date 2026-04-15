@@ -3,19 +3,25 @@ import React, {forwardRef} from 'react';
 import type {TabsProps} from '../../typings/hyper';
 import {decorate, getTabProps} from '../utils/plugins';
 
-import DropdownButton from './new-tab';
 import Tab_ from './tab';
 
 const Tab = decorate(Tab_, 'Tab');
 const isMac = /Mac/.test(navigator.userAgent);
 
 const Tabs = forwardRef<HTMLElement, TabsProps>((props, ref) => {
-  const {tabs = [], borderColor, onChange, onClose, fullScreen} = props;
+  const {tabs = [], borderColor, onChange, onClose, fullScreen, openNewTab, defaultProfile, profiles} = props;
+
+  const accentFor = (profileName?: string) => {
+    if (!profileName) return undefined;
+    return profiles?.find((p) => p.name === profileName)?.color;
+  };
 
   const hide = !isMac && tabs.length === 1;
+  const tabsVisible = tabs.length > 1;
 
   return (
     <nav className={`tabs_nav ${hide ? 'tabs_hiddenNav' : ''}`} ref={ref}>
+      <div className="tabs_dragStrip" />
       {props.customChildrenBefore}
       {tabs.length === 1 && isMac ? <div className="tabs_title">{tabs[0].title}</div> : null}
       {tabs.length > 1 ? (
@@ -30,6 +36,7 @@ const Tabs = forwardRef<HTMLElement, TabsProps>((props, ref) => {
                 borderColor,
                 isActive,
                 hasActivity,
+                accentColor: accentFor(tab.profile),
                 onSelect: onChange.bind(null, uid),
                 onClose: onClose.bind(null, uid)
               });
@@ -45,8 +52,48 @@ const Tabs = forwardRef<HTMLElement, TabsProps>((props, ref) => {
           )}
         </>
       ) : null}
-      <DropdownButton {...props} tabsVisible={tabs.length > 1} />
+      <div
+        title="New Tab"
+        className={`new_tab ${tabsVisible ? 'tabs_visible' : 'tabs_hidden'}`}
+        onClick={() => openNewTab(defaultProfile)}
+        onDoubleClick={(e) => e.stopPropagation()}
+      >
+        +
+      </div>
       {props.customChildren}
+
+      <style jsx>{`
+        .new_tab {
+          background: transparent;
+          color: #fff;
+          border-left-style: solid;
+          border-bottom-style: solid;
+          border-left-width: 1px;
+          border-bottom-width: 1px;
+          cursor: pointer;
+          font-size: 16px;
+          height: 34px;
+          line-height: 34px;
+          padding: 0 16px;
+          text-align: center;
+          -webkit-user-select: none;
+          -webkit-app-region: no-drag;
+        }
+
+        .tabs_visible {
+          border-color: ${borderColor};
+        }
+
+        .tabs_hidden {
+          border-color: transparent;
+          position: absolute;
+          right: 0px;
+        }
+
+        .tabs_hidden:hover {
+          border-color: ${borderColor};
+        }
+      `}</style>
 
       <style jsx>{`
         .tabs_nav {
@@ -102,6 +149,16 @@ const Tabs = forwardRef<HTMLElement, TabsProps>((props, ref) => {
 
         .tabs_borderShimUndo {
           border-bottom-width: 0px;
+        }
+
+        .tabs_dragStrip {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 10px;
+          -webkit-app-region: drag;
+          z-index: 50;
         }
       `}</style>
     </nav>

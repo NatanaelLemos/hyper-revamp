@@ -47,6 +47,11 @@ const config: webpack.Configuration[] = [
             to: './config/[name][ext]'
           },
           {
+            from: './app/config/themes/*.json',
+            globOptions: {ignore: ['**/node_modules/**']},
+            to: './config/themes/[name][ext]'
+          },
+          {
             from: './app/yarn.lock',
             to: 'yarn.lock'
           },

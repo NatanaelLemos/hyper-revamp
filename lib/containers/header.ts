@@ -23,7 +23,8 @@ const getTabs = createSelector(
         uid: t.uid,
         title: session.title,
         isActive: t.uid === activeRootGroup,
-        hasActivity: activityMarkers[session.uid]
+        hasActivity: activityMarkers[session.uid],
+        profile: session.profile
       };
     })
 );

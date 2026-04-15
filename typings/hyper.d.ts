@@ -230,6 +230,7 @@ export type TabProps = {
   onClose: () => void;
   onSelect: () => void;
   text: string;
+  accentColor?: string;
 } & extensionProps;
 
 export type ITab = {
@@ -237,6 +238,7 @@ export type ITab = {
   title: string;
   isActive: boolean;
   hasActivity: boolean;
+  profile?: string;
 };
 
 export type TabsProps = {

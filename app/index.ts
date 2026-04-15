@@ -28,6 +28,7 @@ import parseUrl from 'parse-url';
 import * as AppMenu from './menus/menu';
 import * as plugins from './plugins';
 import {openSettingsWindow, setupSettings} from './settings';
+import {captureSessionState, readSessionState, writeSessionState, clearSessionState} from './ui/session-state';
 import {newWindow} from './ui/window';
 import {installCLI} from './utils/cli-install';
 import * as windowUtils from './utils/window-utils';
@@ -153,8 +154,30 @@ app.on('ready', async () => {
     return hwin;
   }
 
-  // when opening create a new window
-  createWindow();
+  // Session restore — opt-in via `restoreSession: true` in config. First cut
+  // restores top-level tabs with their profile; pane tree and cwd-per-tab are
+  // deferred. If no stored state, fall through to the default single window.
+  const stored = config.getConfig().restoreSession ? readSessionState() : null;
+  if (stored && stored.windows.length > 0) {
+    for (const storedWin of stored.windows) {
+      const [firstTab, ...restTabs] = storedWin.tabs;
+      if (!firstTab) continue;
+      createWindow(
+        (win) => {
+          win.rpc.emit('termgroup add req', {profile: firstTab.profile});
+          for (const tab of restTabs) {
+            win.rpc.emit('termgroup add req', {profile: tab.profile});
+          }
+        },
+        {},
+        firstTab.profile
+      );
+    }
+    clearSessionState();
+  } else {
+    // when opening create a new window
+    createWindow();
+  }
   if (process.env.HYPER_OPEN_SETTINGS_ON_START === '1') {
     setTimeout(() => {
       openSettingsWindow();
@@ -177,6 +200,12 @@ app.on('ready', async () => {
     if (process.platform !== 'darwin' || config.getConfig().quitOnLastWindowClosed !== false) {
       app.quit();
     }
+  });
+
+  app.on('before-quit', () => {
+    if (!config.getConfig().restoreSession) return;
+    const state = captureSessionState(windowSet as unknown as Iterable<{sessions?: Map<string, any>}>);
+    writeSessionState(state);
   });
 
   const makeMenu = () => {

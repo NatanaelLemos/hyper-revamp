@@ -7,6 +7,7 @@ import type {parsedConfig, configOptions} from '../typings/config';
 import {_import, getDefaultConfig} from './config/import';
 import _openConfig from './config/open';
 import {cfgPath, cfgDir} from './config/paths';
+import {resolveProfileConfig} from './config/resolve-profile';
 import notify from './notify';
 import {getColorMap} from './utils/colors';
 
@@ -46,7 +47,6 @@ const _watch = () => {
     // Need to wait 100ms to ensure that write is complete
     setTimeout(() => {
       cfg = _import();
-      notify('Configuration updated', 'hyper-revamp configuration reloaded.');
       watchers.forEach((fn) => {
         fn();
       });
@@ -95,16 +95,10 @@ export const getProfiles = () => {
 };
 
 export const getProfileConfig = (profileName: string): configOptions => {
-  const {profiles, defaultProfile, ...baseConfig} = cfg.config;
-  const profileConfig = profiles.find((p) => p.name === profileName)?.config || {};
-  for (const key in profileConfig) {
-    if (typeof baseConfig[key] === 'object' && !Array.isArray(baseConfig[key])) {
-      baseConfig[key] = {...baseConfig[key], ...profileConfig[key]};
-    } else {
-      baseConfig[key] = profileConfig[key];
-    }
-  }
-  return {...baseConfig, defaultProfile, profiles};
+  const {profiles, defaultProfile, themes, defaultTheme, ...baseConfig} = cfg.config;
+  const profile = profiles.find((p) => p.name === profileName);
+  const merged = resolveProfileConfig(baseConfig, profile, themes, defaultTheme) as Record<string, unknown>;
+  return {...merged, defaultProfile, profiles, themes, defaultTheme} as configOptions;
 };
 
 export const openConfig = () => {

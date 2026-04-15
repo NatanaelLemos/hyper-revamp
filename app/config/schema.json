@@ -188,6 +188,15 @@
                     "description": "color of the text",
                     "type": "string"
                 },
+                "hypercwd": {
+                    "description": "legacy compatibility with the `hypercwd` plugin configuration",
+                    "properties": {
+                        "initialWorkingDirectory": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
                 "imageSupport": {
                     "description": "Whether to enable Sixel and iTerm2 inline image protocol support or not.",
                     "type": "boolean"
@@ -204,25 +213,6 @@
                     "description": "choose either `'vertical'`, if you want the column mode when Option key is hold during selection (Default)\nor `'force'`, if you want to force selection regardless of whether the terminal is in mouse events mode\n(inside tmux or vim with mouse mode enabled for example).",
                     "type": "string"
                 },
-                "opacity": {
-                    "description": "set the window opacity. accepts either a single opacity value or `{focus, blur}` values for focused and unfocused windows. works on macOS and Windows.",
-                    "anyOf": [
-                        {
-                            "type": "number"
-                        },
-                        {
-                            "properties": {
-                                "focus": {
-                                    "type": "number"
-                                },
-                                "blur": {
-                                    "type": "number"
-                                }
-                            },
-                            "type": "object"
-                        }
-                    ]
-                },
                 "modifierKeys": {
                     "properties": {
                         "altIsMeta": {
@@ -238,6 +228,10 @@
                     ],
                     "type": "object"
                 },
+                "opacity": {
+                    "$ref": "#/definitions/WindowOpacity",
+                    "description": "set the window opacity. accepts either a single opacity value\nor `{focus, blur}` values for focused and unfocused windows.\nworks on macOS and Windows."
+                },
                 "padding": {
                     "description": "custom padding (CSS format, i.e.: `top right bottom left` or `top horizontal bottom` or `vertical horizontal` or `all`)",
                     "type": "string"
@@ -245,15 +239,6 @@
                 "preserveCWD": {
                     "description": "set to true to preserve working directory when creating splits or tabs",
                     "type": "boolean"
-                },
-                "hypercwd": {
-                    "description": "legacy compatibility with the `hypercwd` plugin configuration",
-                    "properties": {
-                        "initialWorkingDirectory": {
-                            "type": "string"
-                        }
-                    },
-                    "type": "object"
                 },
                 "quickEdit": {
                     "description": "if `true` on right click selected text will be copied or pasted if no\nselection is present (`true` by default on Windows and disables the context menu feature)",
@@ -340,6 +325,27 @@
                 }
             },
             "type": "object"
+        },
+        "Record<string,ThemeColors>": {
+            "type": "object"
+        },
+        "WindowOpacity": {
+            "anyOf": [
+                {
+                    "properties": {
+                        "blur": {
+                            "type": "number"
+                        },
+                        "focus": {
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
+                {
+                    "type": "number"
+                }
+            ]
         },
         "configOptions": {
             "allOf": [
@@ -548,6 +554,15 @@
                             "description": "color of the text",
                             "type": "string"
                         },
+                        "hypercwd": {
+                            "description": "legacy compatibility with the `hypercwd` plugin configuration",
+                            "properties": {
+                                "initialWorkingDirectory": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
                         "imageSupport": {
                             "description": "Whether to enable Sixel and iTerm2 inline image protocol support or not.",
                             "type": "boolean"
@@ -564,25 +579,6 @@
                             "description": "choose either `'vertical'`, if you want the column mode when Option key is hold during selection (Default)\nor `'force'`, if you want to force selection regardless of whether the terminal is in mouse events mode\n(inside tmux or vim with mouse mode enabled for example).",
                             "type": "string"
                         },
-                        "opacity": {
-                            "description": "set the window opacity. accepts either a single opacity value or `{focus, blur}` values for focused and unfocused windows. works on macOS and Windows.",
-                            "anyOf": [
-                                {
-                                    "type": "number"
-                                },
-                                {
-                                    "properties": {
-                                        "focus": {
-                                            "type": "number"
-                                        },
-                                        "blur": {
-                                            "type": "number"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            ]
-                        },
                         "modifierKeys": {
                             "properties": {
                                 "altIsMeta": {
@@ -598,6 +594,10 @@
                             ],
                             "type": "object"
                         },
+                        "opacity": {
+                            "$ref": "#/definitions/WindowOpacity",
+                            "description": "set the window opacity. accepts either a single opacity value\nor `{focus, blur}` values for focused and unfocused windows.\nworks on macOS and Windows."
+                        },
                         "padding": {
                             "description": "custom padding (CSS format, i.e.: `top right bottom left` or `top horizontal bottom` or `vertical horizontal` or `all`)",
                             "type": "string"
@@ -605,15 +605,6 @@
                         "preserveCWD": {
                             "description": "set to true to preserve working directory when creating splits or tabs",
                             "type": "boolean"
-                        },
-                        "hypercwd": {
-                            "description": "legacy compatibility with the `hypercwd` plugin configuration",
-                            "properties": {
-                                "initialWorkingDirectory": {
-                                    "type": "string"
-                                }
-                            },
-                            "type": "object"
                         },
                         "quickEdit": {
                             "description": "if `true` on right click selected text will be copied or pasted if no\nselection is present (`true` by default on Windows and disables the context menu feature)",
@@ -700,35 +691,21 @@
                         }
                     },
                     "required": [
-                        "backgroundColor",
                         "bell",
                         "bellSound",
                         "bellSoundURL",
-                        "borderColor",
-                        "colors",
                         "copyOnSelect",
                         "css",
-                        "cursorAccentColor",
                         "cursorBlink",
-                        "cursorColor",
                         "cursorShape",
-                        "disableLigatures",
                         "env",
-                        "fontFamily",
-                        "fontSize",
-                        "fontWeight",
-                        "fontWeightBold",
-                        "foregroundColor",
                         "imageSupport",
-                        "letterSpacing",
-                        "lineHeight",
                         "macOptionSelectionMode",
                         "padding",
                         "preserveCWD",
                         "quickEdit",
                         "screenReaderMode",
                         "scrollback",
-                        "selectionColor",
                         "shell",
                         "shellArgs",
                         "showHamburgerMenu",
@@ -746,15 +723,81 @@
                             "description": "The default profile name to use when launching a new session",
                             "type": "string"
                         },
+                        "defaultTheme": {
+                            "description": "The theme applied when a profile does not specify its own.",
+                            "type": "string"
+                        },
                         "profiles": {
                             "description": "A list of profiles to use",
                             "items": {
                                 "properties": {
+                                    "color": {
+                                        "description": "Accent color shown as a bar on the tab (hex/rgb/etc.).",
+                                        "type": "string"
+                                    },
                                     "config": {
-                                        "$ref": "#/definitions/Partial<profileConfigOptions>",
+                                        "$ref": "#/definitions/Partial%3CprofileConfigOptions%3E",
                                         "description": "Specify all the options you want to override for each profile.\nOptions set here override the defaults set in the root."
                                     },
                                     "name": {
+                                        "type": "string"
+                                    },
+                                    "ssh": {
+                                        "description": "SSH connection settings. Required when type === 'ssh'.",
+                                        "properties": {
+                                            "extraArgs": {
+                                                "description": "Additional raw ssh arguments (e.g. ['-J', 'jumphost']).",
+                                                "items": {
+                                                    "type": "string"
+                                                },
+                                                "type": "array"
+                                            },
+                                            "forwardAgent": {
+                                                "description": "Forward the local SSH agent (-A).",
+                                                "type": "boolean"
+                                            },
+                                            "host": {
+                                                "description": "Remote host (hostname or IP).",
+                                                "type": "string"
+                                            },
+                                            "identityFile": {
+                                                "description": "Path to private key file (-i).",
+                                                "type": "string"
+                                            },
+                                            "password": {
+                                                "description": "Password used when authType === 'password'. Stored in plaintext; requires `sshpass` on PATH.",
+                                                "type": "string"
+                                            },
+                                            "authType": {
+                                                "description": "Authentication method: 'publickey' (default) or 'password'.",
+                                                "enum": ["publickey", "password"],
+                                                "type": "string"
+                                            },
+                                            "port": {
+                                                "description": "Optional SSH port (defaults to 22).",
+                                                "type": "number"
+                                            },
+                                            "user": {
+                                                "description": "Remote username.",
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "host",
+                                            "user"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "theme": {
+                                        "description": "Named theme to inherit from (falls back to `defaultTheme`).",
+                                        "type": "string"
+                                    },
+                                    "type": {
+                                        "description": "Profile kind. 'local' (default) runs a shell; 'ssh' opens a remote\nconnection via the `ssh` binary.",
+                                        "enum": [
+                                            "local",
+                                            "ssh"
+                                        ],
                                         "type": "string"
                                     }
                                 },
@@ -765,6 +808,14 @@
                                 "type": "object"
                             },
                             "type": "array"
+                        },
+                        "restoreSession": {
+                            "description": "If true, the previous window's tabs are restored on next launch.",
+                            "type": "boolean"
+                        },
+                        "themes": {
+                            "$ref": "#/definitions/Record%3Cstring%2CThemeColors%3E",
+                            "description": "Named theme palettes. Bundled themes are merged in at startup; any themes\ndeclared here override bundled ones with the same key."
                         }
                     },
                     "required": [
@@ -814,3 +865,4 @@
     },
     "type": "object"
 }
+

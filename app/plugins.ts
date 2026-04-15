@@ -496,9 +496,82 @@ ipcMain.handle('getProfileName', (event) => {
   return win?.profileName || '';
 });
 
+// Manual window-drag helpers — let the renderer drive setPosition when the
+// user mousedowns on a draggable element that can't use `-webkit-app-region:
+// drag` (e.g. tabs, where we still want click-to-switch).
+ipcMain.handle('window:get-position', (event): [number, number] => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const p = win?.getPosition();
+  return p ? [p[0], p[1]] : [0, 0];
+});
+ipcMain.on('window:set-position', (event, x: number, y: number) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  win?.setPosition(Math.round(x), Math.round(y));
+});
+
 ipcMain.handle('shell:openExternal', (event, url) => {
   if (isSafeExternalUrl(url)) {
     return shell.openExternal(url);
   }
   console.warn(`Blocked shell:openExternal for non-http URL: ${url}`);
 });
+
+ipcMain.handle(
+  'ssh:test',
+  (_event, opts: {host: string; user: string; port?: number; identityFile?: string; authType?: 'publickey' | 'password'; password?: string}) => {
+    const {host, user, port, identityFile, authType, password} = opts || ({} as typeof opts);
+    if (!host || !user) {
+      return Promise.resolve({ok: false, stderr: 'host and user are required'});
+    }
+
+    if (authType === 'password') {
+      if (!password) {
+        return Promise.resolve({ok: false, stderr: 'password is required'});
+      }
+      // Use the embedded ssh2 client so password auth works without sshpass.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const {Client} = require('ssh2') as typeof import('ssh2');
+      return new Promise<{ok: boolean; stderr: string}>((resolve) => {
+        const client = new Client();
+        let settled = false;
+        const finish = (ok: boolean, stderr: string) => {
+          if (settled) return;
+          settled = true;
+          try { client.end(); } catch { /* noop */ }
+          resolve({ok, stderr});
+        };
+        client
+          .on('ready', () => finish(true, ''))
+          .on('error', (err) => finish(false, err.message))
+          .on('keyboard-interactive', (_n, _i, _l, _p, submit) => submit([password]));
+        try {
+          client.connect({host, port: port ?? 22, username: user, password, tryKeyboard: true, readyTimeout: 8000});
+        } catch (err) {
+          finish(false, (err as Error).message);
+        }
+        setTimeout(() => finish(false, 'connection timed out'), 10000);
+      });
+    }
+
+    const sshArgs = [
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=5',
+      '-o',
+      'StrictHostKeyChecking=accept-new',
+      ...(port ? ['-p', String(port)] : []),
+      ...(identityFile ? ['-i', identityFile] : []),
+      `${user}@${host}`,
+      'true'
+    ];
+    return new Promise<{ok: boolean; stderr: string}>((resolve) => {
+      const child = execFile('ssh', sshArgs, {timeout: 6000, maxBuffer: 64 * 1024}, (err, _stdout, stderr) => {
+        resolve({ok: !err, stderr: String(stderr || (err ? err.message : '')).trim()});
+      });
+      child.on('error', (err) => {
+        resolve({ok: false, stderr: err.message});
+      });
+    });
+  }
+);

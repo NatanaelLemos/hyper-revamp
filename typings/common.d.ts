@@ -126,6 +126,7 @@ export type IpcCommands = {
   getDecoratedConfig: (profile: string) => configOptions;
   getDecoratedKeymaps: () => Record<string, string[]>;
   getProfileName: () => string;
+  'window:get-position': () => [number, number];
   'settings:get': () => {
     configPath: string;
     rawText: string;
@@ -141,6 +142,10 @@ export type IpcCommands = {
     schema: Record<string, any>;
   };
   'shell:openExternal': (url: string) => void;
+  'ssh:test': (opts: {host: string; user: string; port?: number; identityFile?: string; authType?: 'publickey' | 'password'; password?: string}) => Promise<{
+    ok: boolean;
+    stderr: string;
+  }>;
 };
 
 export interface IpcMainWithCommands extends IpcMain {

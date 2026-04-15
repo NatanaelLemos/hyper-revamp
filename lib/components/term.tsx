@@ -210,7 +210,6 @@ export default class Term extends React.PureComponent<
         return props.webLinksActivationKey ? event[`${props.webLinksActivationKey}Key`] : true;
       };
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       this.term.attachCustomKeyEventHandler(this.keyboardHandler);
       this.term.loadAddon(this.fitAddon);
       this.term.loadAddon(this.searchAddon);
@@ -416,10 +415,20 @@ export default class Term extends React.PureComponent<
     this.fitAddon.fit();
   }
 
-  keyboardHandler(e: any) {
+  keyboardHandler = (e: KeyboardEvent) => {
     // Has Mousetrap flagged this event as a command?
-    return !e.catched;
-  }
+    if ((e as any).catched) return false;
+
+    // Shift+Enter: send the Kitty keyboard protocol sequence so CLI apps
+    // like Claude Code can distinguish it from plain Enter and insert a newline
+    // instead of submitting. Without this, xterm sends \r for both keystrokes.
+    if (e.key === 'Enter' && e.shiftKey) {
+      this.props.onData('\x1b[13;2u');
+      return false;
+    }
+
+    return true;
+  };
 
   setBellSound(bell: 'SOUND' | false, sound: string | null) {
     if (bell && bell.toUpperCase() === 'SOUND') {
@@ -474,6 +483,21 @@ export default class Term extends React.PureComponent<
 
     if (prevProps.rows !== this.props.rows || prevProps.cols !== this.props.cols) {
       this.resize(this.props.cols!, this.props.rows!);
+    }
+
+    // When a tab becomes active, its term group moves back on-screen. xterm's
+    // IntersectionObserver pauses the Canvas/WebGL renderer while off-screen
+    // and doesn't always repaint on re-entry, leaving a black frame until the
+    // next write. Force a refresh to redraw the buffer.
+    if (!prevProps.isTermActive && this.props.isTermActive) {
+      // Defer past the IntersectionObserver callback so xterm's renderer has
+      // resumed by the time we request a repaint; a single rAF still fires
+      // before the observer on some frames, hence the double.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          this.term?.refresh(0, this.term.rows - 1);
+        });
+      });
     }
   }
 

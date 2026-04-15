@@ -62,7 +62,14 @@ export default class Terms extends React.Component<React.PropsWithChildren<Terms
   componentDidUpdate(prevProps: TermsProps) {
     for (const uid in prevProps.sessions) {
       if (!this.props.sessions[uid]) {
-        this.terms[uid].term.dispose();
+        try {
+          this.terms[uid].term.dispose();
+        } catch (err) {
+          // xterm's WebGL/Canvas addon throws during dispose if its renderer
+          // has already been torn down (reads `onRequestRedraw` on undefined).
+          // Harmless — the Terminal is being discarded anyway.
+          console.warn('Error disposing terminal', err);
+        }
         delete this.terms[uid];
       }
     }

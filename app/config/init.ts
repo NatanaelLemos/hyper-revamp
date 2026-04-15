@@ -7,6 +7,8 @@ import type {parsedConfig, rawConfig, configOptions} from '../../typings/config'
 import notify from '../notify';
 import mapKeys from '../utils/map-keys';
 
+import {loadBundledThemes} from './themes';
+
 const _extract = (script?: vm.Script): Record<string, any> => {
   const module: Record<string, any> = {};
   script?.runInNewContext({module}, {displayErrors: true});
@@ -86,6 +88,7 @@ const _init = (userCfg: rawConfig, defaultCfg: rawConfig): parsedConfig => {
       if (userCfg?.config) {
         const conf = userCfg.config;
         conf.defaultProfile = conf.defaultProfile || 'default';
+        conf.defaultTheme = conf.defaultTheme || 'default';
         conf.profiles = conf.profiles || [];
         conf.profiles = conf.profiles.length > 0 ? conf.profiles : [{name: 'default', config: {}}];
         conf.profiles = conf.profiles.map((p, i) => ({
@@ -96,6 +99,8 @@ const _init = (userCfg: rawConfig, defaultCfg: rawConfig): parsedConfig => {
         if (!conf.profiles.map((p) => p.name).includes(conf.defaultProfile)) {
           conf.defaultProfile = conf.profiles[0].name;
         }
+        // User-declared themes override bundled ones with the same key.
+        conf.themes = {...loadBundledThemes(), ...(conf.themes ?? {})};
         return merge({}, defaultCfg.config, conf);
       } else {
         notify('Error reading configuration: `config` key is missing');

@@ -454,13 +454,6 @@ const reducer: IUiReducer = (state = initial, action) => {
       break;
   }
 
-  // Show a notification if any of the font size values have changed
-  if (CONFIG_LOAD !== action.type) {
-    if (state_.fontSize !== state.fontSize || state_.fontSizeOverride !== state.fontSizeOverride) {
-      state_ = state_.merge({notifications: {font: true}}, {deep: true});
-    }
-  }
-
   if (state.cols !== null && state.rows !== null && (state.rows !== state_.rows || state.cols !== state_.cols)) {
     state_ = state_.merge({notifications: {resize: true}}, {deep: true});
   }

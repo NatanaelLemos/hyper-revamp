@@ -19,8 +19,8 @@ Object.defineProperty(window, 'profileName', {
   }
 });
 
-export async function getConfig() {
-  return ipcRenderer.invoke('getDecoratedConfig', _profileName);
+export async function getConfig(profileName?: string) {
+  return ipcRenderer.invoke('getDecoratedConfig', profileName ?? _profileName);
 }
 
 export function subscribe(fn: (event: Electron.IpcRendererEvent, ...args: any[]) => void) {

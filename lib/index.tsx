@@ -90,6 +90,26 @@ async function bootstrap() {
     })();
   });
 
+  // When the active tab's profile changes, reload config resolved for that
+  // profile so the theme (colors, fonts, window bg) follows the active tab.
+  let lastActiveProfile: string | undefined;
+  store_.subscribe(() => {
+    const state = store_.getState() as any;
+    const activeRootGroup = state.termGroups?.activeRootGroup;
+    if (!activeRootGroup) return;
+    const activeSessionUid = state.termGroups?.activeSessions?.[activeRootGroup];
+    if (!activeSessionUid) return;
+    const session = state.sessions?.sessions?.[activeSessionUid];
+    const profile = session?.profile;
+    if (!profile || profile === lastActiveProfile) return;
+    lastActiveProfile = profile;
+    void (async () => {
+      const configInfo = await config.getConfig(profile);
+      configInfo.bellSound = store_.getState().ui.bellSound;
+      store_.dispatch(reloadConfig(configInfo));
+    })();
+  });
+
   // initialize communication with main electron process
   // and subscribe to all user intents for example from menus
   rpc.on('ready', () => {

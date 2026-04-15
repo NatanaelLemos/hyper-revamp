@@ -209,6 +209,56 @@ type profileConfigOptions = {
   workingDirectory: string;
 };
 
+/**
+ * A named color palette that a profile can inherit from.
+ * Subset of profileConfigOptions — just the visual colors.
+ */
+export type ThemeColors = {
+  backgroundColor?: string;
+  foregroundColor?: string;
+  cursorColor?: string;
+  cursorAccentColor?: string;
+  borderColor?: string;
+  selectionColor?: string;
+  colors?: Partial<ColorMap>;
+  fontFamily?: string;
+  uiFontFamily?: string;
+  fontSize?: number;
+  fontWeight?: string | number;
+  fontWeightBold?: string | number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  disableLigatures?: boolean;
+};
+
+/**
+ * SSH connection details for a profile of type 'ssh'.
+ */
+export type SshProfile = {
+  /** Remote host (hostname or IP). */
+  host: string;
+  /** Remote username. */
+  user: string;
+  /** Optional SSH port (defaults to 22). */
+  port?: number;
+  /** Path to private key file (-i). */
+  identityFile?: string;
+  /** Forward the local SSH agent (-A). */
+  forwardAgent?: boolean;
+  /** Additional raw ssh arguments (e.g. ['-J', 'jumphost']). */
+  extraArgs?: string[];
+  /**
+   * Authentication method. 'publickey' uses identityFile / ssh-agent;
+   * 'password' uses the `password` field via `sshpass`. Defaults to 'publickey'.
+   */
+  authType?: 'publickey' | 'password';
+  /**
+   * Password for password-auth. Stored in plaintext in the config file.
+   * Only used when `authType === 'password'`. Requires `sshpass` on PATH.
+   */
+  password?: string;
+};
+
 export type configOptions = rootConfigOptions &
   profileConfigOptions & {
     /**
@@ -216,10 +266,40 @@ export type configOptions = rootConfigOptions &
      */
     defaultProfile: string;
     /**
+     * The theme applied when a profile does not specify its own.
+     */
+    defaultTheme?: string;
+    /**
+     * If true, the previous window's tabs are restored on next launch.
+     */
+    restoreSession?: boolean;
+    /**
+     * Named theme palettes. Bundled themes are merged in at startup; any themes
+     * declared here override bundled ones with the same key.
+     */
+    themes?: Record<string, ThemeColors>;
+    /**
      * A list of profiles to use
      */
     profiles: {
       name: string;
+      /**
+       * Profile kind. 'local' (default) runs a shell; 'ssh' opens a remote
+       * connection via the `ssh` binary.
+       */
+      type?: 'local' | 'ssh';
+      /**
+       * SSH connection settings. Required when type === 'ssh'.
+       */
+      ssh?: SshProfile;
+      /**
+       * Named theme to inherit from (falls back to `defaultTheme`).
+       */
+      theme?: string;
+      /**
+       * Accent color shown as a bar on the tab (hex/rgb/etc.).
+       */
+      color?: string;
       /**
        * Specify all the options you want to override for each profile.
        * Options set here override the defaults set in the root.

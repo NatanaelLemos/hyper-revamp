@@ -9,10 +9,13 @@ import type {IPty, IWindowsPtyForkOptions, spawn as npSpawn} from 'node-pty';
 import osLocale from 'os-locale';
 import {shellEnvSync} from 'shell-env';
 
+import type {SshProfile} from '../typings/config';
+
 import * as config from './config';
 import {cliScriptPath} from './config/paths';
 import {productName, version} from './package.json';
 import {getDecoratedEnv} from './plugins';
+import {Ssh2Pty} from './ssh2-pty';
 import {getFallBackShellConfig} from './utils/shell-fallback';
 
 const createNodePtyError = () =>
@@ -128,9 +131,15 @@ interface SessionOptions {
   shell?: string;
   shellArgs?: string[];
   profile: string;
+  /**
+   * When set, the session bypasses node-pty/ssh and connects via the embedded
+   * ssh2 client. Used for SSH profiles with password auth so users don't need
+   * an external binary like `sshpass`.
+   */
+  ssh2?: SshProfile;
 }
 export default class Session extends EventEmitter {
-  pty: IPty | null;
+  pty: IPty | Ssh2Pty | null;
   batcher: DataBatcher | null;
   shell: string | null;
   ended: boolean;
@@ -146,9 +155,30 @@ export default class Session extends EventEmitter {
     this.init(options);
   }
 
-  init({uid, rows, cols, cwd, shell: _shell, shellArgs: _shellArgs, profile}: SessionOptions) {
-    ensureNodePtySpawnHelperExecutable();
+  init({uid, rows, cols, cwd, shell: _shell, shellArgs: _shellArgs, profile, ssh2}: SessionOptions) {
     this.profile = profile;
+
+    if (ssh2) {
+      this.pty = new Ssh2Pty(ssh2, {cols: cols ?? 80, rows: rows ?? 24});
+      this.batcher = new DataBatcher(uid);
+      this.pty.onData((chunk: string) => {
+        if (this.ended) return;
+        this.batcher?.write(chunk);
+      });
+      this.batcher.on('flush', (data: string) => {
+        this.emit('data', data);
+      });
+      this.pty.onExit(() => {
+        if (!this.ended) {
+          this.ended = true;
+          this.emit('exit');
+        }
+      });
+      this.shell = 'ssh2';
+      return;
+    }
+
+    ensureNodePtySpawnHelperExecutable();
     const envFromConfig = config.getProfileConfig(profile).env || {};
     const defaultShellArgs = ['--login'];
 

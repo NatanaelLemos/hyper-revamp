@@ -42,53 +42,6 @@ const configGroups: FieldGroup[] = [
     fields: ['updateChannel', 'disableAutoUpdates', 'defaultSSHApp', 'quitOnLastWindowClosed', 'autoUpdatePlugins', 'useConpty']
   },
   {
-    title: 'Shell And Sessions',
-    description: 'Startup shell, working directory behavior, profiles, and native cwd-preservation settings.',
-    fields: ['shell', 'shellArgs', 'workingDirectory', 'preserveCWD', 'hypercwd', 'defaultProfile', 'windowSize']
-  },
-  {
-    title: 'Typography',
-    description: 'Font stack, sizing, spacing, and rendering details for the terminal UI.',
-    fields: ['fontFamily', 'uiFontFamily', 'fontSize', 'fontWeight', 'fontWeightBold', 'lineHeight', 'letterSpacing', 'disableLigatures']
-  },
-  {
-    title: 'Appearance',
-    description: 'Window colors, cursor styling, padding, and opacity behavior.',
-    fields: [
-      'backgroundColor',
-      'foregroundColor',
-      'selectionColor',
-      'borderColor',
-      'cursorColor',
-      'cursorAccentColor',
-      'cursorShape',
-      'cursorBlink',
-      'padding',
-      'opacity',
-      'colors'
-    ]
-  },
-  {
-    title: 'Behavior',
-    description: 'Selection, bell, accessibility, rendering, and general terminal interaction defaults.',
-    fields: [
-      'bell',
-      'bellSound',
-      'bellSoundURL',
-      'copyOnSelect',
-      'quickEdit',
-      'screenReaderMode',
-      'imageSupport',
-      'webGLRenderer',
-      'webLinksActivationKey',
-      'macOptionSelectionMode',
-      'showHamburgerMenu',
-      'showWindowControls',
-      'scrollback',
-      'modifierKeys'
-    ]
-  },
-  {
     title: 'Advanced',
     description: 'Raw environment values and custom CSS hooks for the window and terminal surface.',
     fields: ['env', 'css', 'termCSS']
@@ -97,7 +50,6 @@ const configGroups: FieldGroup[] = [
 
 const profileFields: string[] = [
   'shell', 'shellArgs', 'workingDirectory',
-  'fontFamily', 'uiFontFamily', 'fontSize', 'fontWeight', 'fontWeightBold', 'lineHeight', 'letterSpacing', 'disableLigatures',
   'backgroundColor', 'foregroundColor', 'selectionColor', 'borderColor', 'cursorColor', 'cursorAccentColor', 'cursorShape', 'cursorBlink', 'padding', 'opacity', 'colors',
   'bell', 'bellSound', 'bellSoundURL', 'copyOnSelect', 'quickEdit', 'scrollback', 'env', 'css', 'termCSS'
 ];
@@ -462,6 +414,280 @@ const MonacoEditor = ({
   );
 };
 
+type SshSettings = {host?: string; user?: string; port?: number; identityFile?: string; forwardAgent?: boolean; password?: string; authType?: 'publickey' | 'password'};
+type DraftProfileLike = {name: string; ssh?: SshSettings};
+
+const SshProfileEditor: React.FC<{
+  profile: DraftProfileLike;
+  activeProfileIndex: number;
+  updateDraft: (path: PathSegment[], nextValue: unknown) => void;
+}> = ({profile, activeProfileIndex, updateDraft}) => {
+  const ssh = profile.ssh || {};
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ok: boolean; stderr: string} | null>(null);
+
+  const setSshField = (key: keyof SshSettings, value: unknown) => {
+    const next: SshSettings = {...(profile.ssh || {}), [key]: value};
+    // Strip empty strings / undefined / false (for forwardAgent we keep false as absence)
+    if (value === '' || value === undefined) delete (next as Record<string, unknown>)[key as string];
+    if (key === 'forwardAgent' && value === false) delete next.forwardAgent;
+    updateDraft(['config', 'profiles', activeProfileIndex, 'ssh'], next);
+  };
+
+  const runTest = async () => {
+    if (!ssh.host || !ssh.user) {
+      setTestResult({ok: false, stderr: 'host and user are required'});
+      return;
+    }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const effectiveAuth = ssh.password ? 'password' : (ssh.authType || 'publickey');
+      const result = await ipcRenderer.invoke('ssh:test', {
+        host: ssh.host,
+        user: ssh.user,
+        port: ssh.port,
+        identityFile: ssh.identityFile,
+        authType: effectiveAuth,
+        password: ssh.password
+      });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ok: false, stderr: (err as Error).message});
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="ssh_fields">
+      <div className="profile_field_row">
+        <label className="profile_field_label">Host</label>
+        <input type="text" value={ssh.host || ''} onChange={(e) => setSshField('host', e.target.value)} placeholder="example.com" />
+      </div>
+      <div className="profile_field_row">
+        <label className="profile_field_label">User</label>
+        <input type="text" value={ssh.user || ''} onChange={(e) => setSshField('user', e.target.value)} placeholder="root" />
+      </div>
+      <div className="profile_field_row">
+        <label className="profile_field_label">Port</label>
+        <input
+          type="number"
+          value={ssh.port ?? ''}
+          onChange={(e) => setSshField('port', e.target.value === '' ? undefined : Number(e.target.value))}
+          placeholder="22"
+        />
+      </div>
+      <div className="profile_type_row">
+        <label className="profile_field_label">Auth method</label>
+        <div className="profile_type_toggle">
+          {(['publickey', 'password'] as const).map((kind) => (
+            <button
+              type="button"
+              key={kind}
+              className={`profile_type_btn ${((ssh.authType || 'publickey') === kind) ? 'active' : ''}`}
+              onClick={() => setSshField('authType', kind)}
+            >
+              {kind === 'publickey' ? 'Public key' : 'Password'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {(ssh.authType || 'publickey') === 'password' ? (
+        <>
+          <div className="profile_field_row">
+            <label className="profile_field_label">Password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={ssh.password || ''}
+              onChange={(e) => setSshField('password', e.target.value)}
+              placeholder="Required"
+            />
+          </div>
+          <div className="profile_field_row">
+            <label className="profile_field_label" />
+            <span className="profile_field_hint">
+              Password is stored in plaintext in the config file. Connection is handled by the embedded SSH client — no external tools required.
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="profile_field_row">
+          <label className="profile_field_label">Identity file</label>
+          <input
+            type="text"
+            value={ssh.identityFile || ''}
+            onChange={(e) => setSshField('identityFile', e.target.value)}
+            placeholder="~/.ssh/id_ed25519"
+          />
+        </div>
+      )}
+      <div className="profile_field_row">
+        <label className="profile_field_label">Forward agent (-A)</label>
+        <input
+          type="checkbox"
+          checked={!!ssh.forwardAgent}
+          onChange={(e) => setSshField('forwardAgent', e.target.checked)}
+        />
+      </div>
+      <div className="profile_field_row">
+        <button type="button" className="profile_add_btn" onClick={runTest} disabled={testing}>
+          {testing ? 'Testing…' : 'Test connection'}
+        </button>
+        {testResult ? (
+          <span className={`ssh_test_result ${testResult.ok ? 'ok' : 'err'}`}>
+            {testResult.ok ? '✓ reachable' : `✗ ${testResult.stderr || 'failed'}`}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
+type ThemePalette = {
+  backgroundColor?: string;
+  foregroundColor?: string;
+  cursorColor?: string;
+  cursorAccentColor?: string;
+  borderColor?: string;
+  selectionColor?: string;
+  colors?: Record<string, string>;
+  fontFamily?: string;
+  uiFontFamily?: string;
+  fontSize?: number;
+  fontWeight?: string | number;
+  fontWeightBold?: string | number;
+  lineHeight?: number;
+  letterSpacing?: number;
+  disableLigatures?: boolean;
+};
+
+const ANSI_COLOR_KEYS = [
+  'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
+  'lightBlack', 'lightRed', 'lightGreen', 'lightYellow', 'lightBlue', 'lightMagenta', 'lightCyan', 'lightWhite'
+] as const;
+
+const TOP_COLOR_KEYS: Array<keyof ThemePalette> = [
+  'backgroundColor', 'foregroundColor', 'cursorColor', 'cursorAccentColor', 'borderColor', 'selectionColor'
+];
+
+const ThemeCard: React.FC<{
+  id: string;
+  theme: ThemePalette;
+  isEditing: boolean;
+  onToggleEdit: () => void;
+  onChange: (next: ThemePalette) => void;
+}> = ({id, theme, isEditing, onToggleEdit, onChange}) => {
+  const bg = theme.backgroundColor || '#1e1e1e';
+  const fg = theme.foregroundColor || '#f0f0f0';
+  const caret = theme.cursorColor || fg;
+  const dots = [
+    theme.colors?.red,
+    theme.colors?.green,
+    theme.colors?.yellow,
+    theme.colors?.blue,
+    theme.colors?.magenta,
+    theme.colors?.cyan,
+    theme.colors?.white,
+    theme.colors?.lightBlack
+  ];
+
+  const setTop = (key: keyof ThemePalette, value: string) => {
+    onChange({...theme, [key]: value});
+  };
+  const setAnsi = (key: string, value: string) => {
+    onChange({...theme, colors: {...(theme.colors || {}), [key]: value}});
+  };
+
+  return (
+    <div className="theme_card">
+      <div className="theme_preview" style={{background: bg, color: fg}}>
+        <div className="theme_preview_line">$ echo hello</div>
+        <div className="theme_preview_line" style={{color: theme.colors?.green || fg}}>hello</div>
+        <div className="theme_preview_line">
+          $ <span className="theme_preview_caret" style={{background: caret}}>&nbsp;</span>
+        </div>
+        <div className="theme_preview_dots">
+          {dots.map((c, i) => (
+            <span key={i} className="theme_preview_dot" style={{background: c || 'transparent'}} />
+          ))}
+        </div>
+      </div>
+      <div className="theme_card_footer">
+        <span className="theme_card_title">{id}</span>
+        <button
+          type="button"
+          className={`theme_card_btn ${isEditing ? 'active' : ''}`}
+          onClick={onToggleEdit}
+        >
+          {isEditing ? 'Done' : 'Edit'}
+        </button>
+      </div>
+      {isEditing ? (
+        <div className="theme_edit_panel">
+          {TOP_COLOR_KEYS.map((key) => {
+            const value = (theme[key] as string) || '';
+            const isHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+            return (
+              <div className="theme_edit_row" key={key}>
+                <label>{humanizeLabel(String(key))}</label>
+                <input type="text" value={value} onChange={(e) => setTop(key, e.target.value)} placeholder="#000000 or rgba(...)" />
+                {isHex ? <input type="color" value={value} onChange={(e) => setTop(key, e.target.value)} /> : null}
+              </div>
+            );
+          })}
+          <div className="theme_edit_section">Typography</div>
+          <div className="theme_edit_row">
+            <label>Font family</label>
+            <input type="text" value={theme.fontFamily || ''} onChange={(e) => onChange({...theme, fontFamily: e.target.value || undefined})} placeholder='"Menlo", monospace' />
+          </div>
+          <div className="theme_edit_row">
+            <label>UI font family</label>
+            <input type="text" value={theme.uiFontFamily || ''} onChange={(e) => onChange({...theme, uiFontFamily: e.target.value || undefined})} placeholder='"Helvetica Neue", sans-serif' />
+          </div>
+          <div className="theme_edit_row">
+            <label>Font size</label>
+            <input type="number" value={theme.fontSize ?? ''} onChange={(e) => onChange({...theme, fontSize: e.target.value === '' ? undefined : Number(e.target.value)})} placeholder="12" />
+          </div>
+          <div className="theme_edit_row">
+            <label>Font weight</label>
+            <input type="text" value={theme.fontWeight ?? ''} onChange={(e) => onChange({...theme, fontWeight: e.target.value || undefined})} placeholder="normal / 400" />
+          </div>
+          <div className="theme_edit_row">
+            <label>Bold weight</label>
+            <input type="text" value={theme.fontWeightBold ?? ''} onChange={(e) => onChange({...theme, fontWeightBold: e.target.value || undefined})} placeholder="bold / 700" />
+          </div>
+          <div className="theme_edit_row">
+            <label>Line height</label>
+            <input type="number" step="0.01" value={theme.lineHeight ?? ''} onChange={(e) => onChange({...theme, lineHeight: e.target.value === '' ? undefined : Number(e.target.value)})} placeholder="1.0" />
+          </div>
+          <div className="theme_edit_row">
+            <label>Letter spacing</label>
+            <input type="number" step="0.1" value={theme.letterSpacing ?? ''} onChange={(e) => onChange({...theme, letterSpacing: e.target.value === '' ? undefined : Number(e.target.value)})} placeholder="0" />
+          </div>
+          <div className="theme_edit_row">
+            <label>Disable ligatures</label>
+            <input type="checkbox" checked={!!theme.disableLigatures} onChange={(e) => onChange({...theme, disableLigatures: e.target.checked || undefined})} />
+          </div>
+          <div className="theme_edit_section">ANSI colors</div>
+          {ANSI_COLOR_KEYS.map((key) => {
+            const value = theme.colors?.[key] || '';
+            const isHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+            return (
+              <div className="theme_edit_row" key={key}>
+                <label>{humanizeLabel(key)}</label>
+                <input type="text" value={value} onChange={(e) => setAnsi(key, e.target.value)} placeholder="#000000" />
+                {isHex ? <input type="color" value={value} onChange={(e) => setAnsi(key, e.target.value)} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const SettingsApp = () => {
   const [payload, setPayload] = useState<SettingsPayload | null>(null);
   const [draftObject, setDraftObject] = useState<rawConfig | null>(null);
@@ -476,6 +702,7 @@ const SettingsApp = () => {
   const [error, setError] = useState('');
   const [reloadRequested, setReloadRequested] = useState(false);
   const [activeProfileIndex, setActiveProfileIndex] = useState(0);
+  const [editingThemeId, setEditingThemeId] = useState<string | null>(null);
 
   const load = async () => {
     const nextPayload = await ipcRenderer.invoke('settings:get');
@@ -581,6 +808,24 @@ const SettingsApp = () => {
       window.setTimeout(() => setStatus(''), 3000);
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : 'Failed to save settings.';
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const applyAndSave = async (mutator: (current: rawConfig) => rawConfig) => {
+    if (!draftObject) return;
+    const next = mutator(draftObject);
+    setDraftObject(next);
+    setSaving(true);
+    try {
+      const nextPayload = await ipcRenderer.invoke('settings:save', formatJson(next));
+      setPayload(nextPayload);
+      setDraftObject(cloneValue(nextPayload.rawConfig));
+      setTextValue(nextPayload.rawText);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save settings.';
       setError(message);
     } finally {
       setSaving(false);
@@ -919,22 +1164,22 @@ const SettingsApp = () => {
           ) : null}
         </div>
 
-        {filteredGroups.map((group) => (
-          <section className="settings_section" key={group.title} id={slugify(group.title)}>
-            <div className="section_header">
-              <h3 className="section_title">{group.title}</h3>
-              <p className="section_desc">{group.description}</p>
-            </div>
-            <div className="section_card">
-              {group.visibleFields.map((field) => renderField(configSchema.properties?.[field], ['config', field], humanizeLabel(field)))}
-            </div>
-          </section>
-        ))}
-
         {profilesSectionVisible ? (() => {
-          const profiles: Array<{name: string; config: Record<string, unknown>}> = (draftObject as any).config?.profiles || [];
+          type DraftProfile = {
+            name: string;
+            type?: 'local' | 'ssh';
+            ssh?: {host?: string; user?: string; port?: number; identityFile?: string; forwardAgent?: boolean; extraArgs?: string[]};
+            theme?: string;
+            color?: string;
+            config: Record<string, unknown>;
+          };
+          const profiles: DraftProfile[] = ((draftObject as any).config?.profiles || []) as DraftProfile[];
           const activeProfile = profiles[activeProfileIndex] || profiles[0];
           const profileConfigSchema = configSchema;
+          const availableThemes: string[] = Array.from(new Set([
+            ...Object.keys((payload as any)?.bundledThemes || {}),
+            ...Object.keys((draftObject as any).config?.themes || {})
+          ]));
 
           const addProfile = () => {
             const name = `Profile ${profiles.length + 1}`;
@@ -1000,12 +1245,73 @@ const SettingsApp = () => {
                       </div>
                     </div>
                     <p className="profile_detail_hint">Only set values you want to override. Unset fields inherit from the root config above.</p>
+
+                    <div className="profile_type_row">
+                      <label className="profile_field_label">Profile type</label>
+                      <div className="profile_type_toggle">
+                        {(['local', 'ssh'] as const).map((kind) => (
+                          <button
+                            type="button"
+                            key={kind}
+                            className={`profile_type_btn ${((activeProfile.type || 'local') === kind) ? 'active' : ''}`}
+                            onClick={() => updateDraft(['config', 'profiles', activeProfileIndex, 'type'], kind)}
+                          >
+                            {kind === 'ssh' ? 'SSH' : 'Local'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {activeProfile.type === 'ssh' ? (
+                      <SshProfileEditor
+                        profile={activeProfile}
+                        activeProfileIndex={activeProfileIndex}
+                        updateDraft={updateDraft}
+                      />
+                    ) : null}
+
+                    <div className="profile_field_row">
+                      <label className="profile_field_label">Theme</label>
+                      <select
+                        value={activeProfile.theme || (draftObject as any).config?.defaultTheme || 'default'}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          void applyAndSave((current) =>
+                            setAtPath(current, ['config', 'profiles', activeProfileIndex, 'theme'], value) as rawConfig
+                          );
+                        }}
+                      >
+                        {availableThemes.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="profile_field_row">
+                      <label className="profile_field_label">Accent color</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. #7aa2f7"
+                        value={activeProfile.color || ''}
+                        onChange={(e) =>
+                          updateDraft(
+                            ['config', 'profiles', activeProfileIndex, 'color'],
+                            e.target.value || undefined
+                          )
+                        }
+                      />
+                    </div>
+
                     <div className="profile_fields">
-                      {profileFields.map((field) => {
-                        const fieldSchema = profileConfigSchema?.properties?.[field];
-                        if (!fieldSchema) return null;
-                        return renderField(fieldSchema, ['config', 'profiles', activeProfileIndex, 'config', field], humanizeLabel(field));
-                      })}
+                      {profileFields
+                        .filter((f) =>
+                          activeProfile.type !== 'ssh' || !['shell', 'shellArgs', 'workingDirectory'].includes(f)
+                        )
+                        .map((field) => {
+                          const fieldSchema = profileConfigSchema?.properties?.[field];
+                          if (!fieldSchema) return null;
+                          return renderField(fieldSchema, ['config', 'profiles', activeProfileIndex, 'config', field], humanizeLabel(field));
+                        })}
                     </div>
                   </div>
                 ) : null}
@@ -1013,6 +1319,89 @@ const SettingsApp = () => {
             </section>
           );
         })() : null}
+
+        {profilesSectionVisible ? (() => {
+          const bundled: Record<string, ThemePalette> = ((payload as any)?.bundledThemes || {}) as Record<string, ThemePalette>;
+          const userThemes: Record<string, ThemePalette> = (((draftObject as any).config?.themes || {}) as Record<string, ThemePalette>);
+          const themesMap: Record<string, ThemePalette> = {...bundled, ...userThemes};
+          const themeIds = Object.keys(themesMap);
+
+          const updateTheme = (id: string, next: ThemePalette) => {
+            void applyAndSave((current) => {
+              const themes = {...((current as any).config?.themes || {}), [id]: next};
+              return setAtPath(current, ['config', 'themes'], themes) as rawConfig;
+            });
+          };
+
+          const newTheme = () => {
+            let i = 1;
+            while (themesMap[`custom-${i}`]) i++;
+            const id = `custom-${i}`;
+            const seed: ThemePalette = {
+              backgroundColor: '#1e1e2e',
+              foregroundColor: '#cdd6f4',
+              cursorColor: '#f5e0dc',
+              cursorAccentColor: '#1e1e2e',
+              borderColor: '#181825',
+              selectionColor: 'rgba(88, 91, 112, 0.6)',
+              colors: {
+                black: '#45475a', red: '#f38ba8', green: '#a6e3a1', yellow: '#f9e2af',
+                blue: '#89b4fa', magenta: '#f5c2e7', cyan: '#94e2d5', white: '#bac2de',
+                lightBlack: '#585b70', lightRed: '#f38ba8', lightGreen: '#a6e3a1', lightYellow: '#f9e2af',
+                lightBlue: '#89b4fa', lightMagenta: '#f5c2e7', lightCyan: '#94e2d5', lightWhite: '#a6adc8'
+              }
+            };
+            void applyAndSave((current) => {
+              const themes = {...((current as any).config?.themes || {}), [id]: seed};
+              return setAtPath(current, ['config', 'themes'], themes) as rawConfig;
+            });
+            setEditingThemeId(id);
+          };
+
+          return (
+            <section className="settings_section" id="themes">
+              <div className="section_header">
+                <h3 className="section_title">Themes</h3>
+                <p className="section_desc">Named color palettes. Assign one to a profile above. Click Edit on any theme to override its palette.</p>
+              </div>
+              <div className="section_card">
+                <div className="theme_toolbar">
+                  <button type="button" className="profile_add_btn" onClick={newTheme}>
+                    + New theme
+                  </button>
+                </div>
+                {themeIds.length === 0 ? (
+                  <p className="section_desc">No themes available.</p>
+                ) : (
+                  <div className="theme_gallery">
+                    {themeIds.map((id) => (
+                      <ThemeCard
+                        key={id}
+                        id={id}
+                        theme={themesMap[id]}
+                        isEditing={editingThemeId === id}
+                        onToggleEdit={() => setEditingThemeId(editingThemeId === id ? null : id)}
+                        onChange={(next) => updateTheme(id, next)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          );
+        })() : null}
+
+        {filteredGroups.map((group) => (
+          <section className="settings_section" key={group.title} id={slugify(group.title)}>
+            <div className="section_header">
+              <h3 className="section_title">{group.title}</h3>
+              <p className="section_desc">{group.description}</p>
+            </div>
+            <div className="section_card">
+              {group.visibleFields.map((field) => renderField(configSchema.properties?.[field], ['config', field], humanizeLabel(field)))}
+            </div>
+          </section>
+        ))}
 
         {pluginSectionVisible ? (
           <section className="settings_section" id="plugins">
@@ -1835,6 +2224,195 @@ const SettingsApp = () => {
         .settings_root .profile_fields {
           display: flex;
           flex-direction: column;
+        }
+
+        .settings_root .profile_type_row,
+        .settings_root .profile_field_row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 8px 0;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .settings_root .profile_type_row .profile_field_label,
+        .settings_root .profile_field_row .profile_field_label {
+          min-width: 160px;
+          margin: 0;
+        }
+
+        .settings_root .profile_field_hint {
+          font-size: 11px;
+          color: var(--muted-fg);
+        }
+
+        .settings_root .profile_field_hint code {
+          padding: 1px 4px;
+          border-radius: 3px;
+          background: var(--subtle-bg);
+          font-size: 11px;
+        }
+
+        .settings_root .profile_type_toggle {
+          display: inline-flex;
+          gap: 4px;
+          background: var(--subtle-bg);
+          padding: 3px;
+          border-radius: 6px;
+          border: 1px solid var(--border);
+        }
+
+        .settings_root .profile_type_btn {
+          padding: 4px 12px;
+          background: transparent;
+          color: var(--muted-fg);
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 12px;
+        }
+
+        .settings_root .profile_type_btn.active {
+          background: var(--accent);
+          color: #fff;
+        }
+
+        .settings_root .ssh_fields {
+          padding: 8px 0 12px;
+          border-bottom: 1px solid var(--border);
+        }
+
+        .settings_root .ssh_test_result {
+          font-size: 12px;
+          font-family: var(--mono);
+        }
+        .settings_root .ssh_test_result.ok { color: #4ade80; }
+        .settings_root .ssh_test_result.err { color: #f87171; }
+
+        .settings_root .theme_gallery {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 16px;
+        }
+
+        .settings_root .theme_card {
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          overflow: hidden;
+          background: var(--subtle-bg);
+        }
+
+        .settings_root .theme_preview {
+          padding: 12px;
+          font-family: var(--mono);
+          font-size: 12px;
+          min-height: 120px;
+        }
+
+        .settings_root .theme_preview_line {
+          line-height: 1.6;
+          white-space: pre;
+        }
+
+        .settings_root .theme_preview_caret {
+          display: inline-block;
+          width: 6px;
+          height: 14px;
+          vertical-align: middle;
+        }
+
+        .settings_root .theme_preview_dots {
+          display: flex;
+          gap: 4px;
+          margin-top: 8px;
+        }
+
+        .settings_root .theme_preview_dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          display: inline-block;
+        }
+
+        .settings_root .theme_card_footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 12px;
+          border-top: 1px solid var(--border);
+        }
+
+        .settings_root .theme_card_title {
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .settings_root .theme_card_btn {
+          font-size: 12px;
+          padding: 4px 10px;
+          border-radius: 4px;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--muted-fg);
+          cursor: pointer;
+        }
+
+        .settings_root .theme_card_btn.active {
+          background: var(--accent);
+          color: #fff;
+          border-color: var(--accent);
+        }
+
+        .settings_root .theme_toolbar {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 12px;
+        }
+
+        .settings_root .theme_edit_panel {
+          padding: 12px;
+          border-top: 1px solid var(--border);
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px 16px;
+          background: var(--bg);
+        }
+
+        .settings_root .theme_edit_section {
+          grid-column: 1 / -1;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: var(--muted-fg);
+          margin-top: 6px;
+        }
+
+        .settings_root .theme_edit_row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .settings_root .theme_edit_row label {
+          flex: 0 0 110px;
+          font-size: 12px;
+          color: var(--muted-fg);
+        }
+
+        .settings_root .theme_edit_row input[type="text"] {
+          flex: 1;
+          min-width: 0;
+          font-size: 12px;
+          padding: 4px 6px;
+        }
+
+        .settings_root .theme_edit_row input[type="color"] {
+          width: 26px;
+          height: 26px;
+          padding: 0;
+          border: 1px solid var(--border);
+          border-radius: 4px;
+          background: transparent;
         }
 
         /* ── Responsive ── */

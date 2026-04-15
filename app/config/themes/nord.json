@@ -1,0 +1,28 @@
+{
+  "fontFamily": "\"Cascadia Code\", Menlo, monospace",
+  "fontSize": 14,
+  "backgroundColor": "#2e3440",
+  "foregroundColor": "#d8dee9",
+  "cursorColor": "#d8dee9",
+  "cursorAccentColor": "#2e3440",
+  "borderColor": "#242933",
+  "selectionColor": "rgba(76, 86, 106, 0.5)",
+  "colors": {
+    "black": "#3b4252",
+    "red": "#bf616a",
+    "green": "#a3be8c",
+    "yellow": "#ebcb8b",
+    "blue": "#81a1c1",
+    "magenta": "#b48ead",
+    "cyan": "#88c0d0",
+    "white": "#e5e9f0",
+    "lightBlack": "#4c566a",
+    "lightRed": "#bf616a",
+    "lightGreen": "#a3be8c",
+    "lightYellow": "#ebcb8b",
+    "lightBlue": "#81a1c1",
+    "lightMagenta": "#b48ead",
+    "lightCyan": "#8fbcbb",
+    "lightWhite": "#eceff4"
+  }
+}

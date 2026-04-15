@@ -13,6 +13,7 @@ import {getDefaultConfig} from './config/import';
 import {_init} from './config/init';
 import * as config from './config';
 import {cfgDir, cfgPath, icon, schemaPath} from './config/paths';
+import {loadBundledThemes} from './config/themes';
 
 let settingsWindow: BrowserWindow | null = null;
 let settingsUrl = '';
@@ -48,7 +49,8 @@ const getSettingsPayload = () => {
     rawText,
     rawConfig,
     defaultConfig: getDefaultConfig(),
-    schema: getSchema()
+    schema: getSchema(),
+    bundledThemes: loadBundledThemes()
   };
 };
 
