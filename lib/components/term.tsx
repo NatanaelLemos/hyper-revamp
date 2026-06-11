@@ -117,6 +117,7 @@ export default class Term extends React.PureComponent<
   termWrapperRef: HTMLElement | null;
   termOptions: ITerminalOptions;
   disposableListeners: IDisposable[];
+  selectionSnapshot: string;
   defaultBellSound: HTMLAudioElement | null;
   bellSound: HTMLAudioElement | null;
   fitAddon: FitAddon;
@@ -142,6 +143,7 @@ export default class Term extends React.PureComponent<
     this.termWrapperRef = null;
     this.termOptions = {};
     this.disposableListeners = [];
+    this.selectionSnapshot = '';
     this.defaultBellSound = null;
     this.bellSound = null;
     this.fitAddon = new FitAddon();
@@ -315,6 +317,20 @@ export default class Term extends React.PureComponent<
       })
     );
 
+    // Snapshot the selected text the moment the selection changes. TUI apps
+    // (Claude Code, vim, htop, ...) rewrite the screen continuously, so by the
+    // time the user presses ⌘C the buffer cells under a still-highlighted
+    // selection can hold different text than what they selected — xterm's own
+    // copy handler reads the live buffer and would copy that new text (or
+    // nothing). The snapshot preserves what the user actually saw.
+    this.disposableListeners.push(
+      this.term.onSelectionChange(() => {
+        this.selectionSnapshot = this.term.getSelection();
+      })
+    );
+    // Capture-phase so this runs before xterm's own bubble-phase copy handler.
+    this.termRef.addEventListener('copy', this.onCopyCapture, {capture: true});
+
     window.addEventListener('paste', this.onWindowPaste, {
       capture: true
     });
@@ -346,16 +362,28 @@ export default class Term extends React.PureComponent<
     }
   };
 
+  getSelectionText() {
+    return this.selectionSnapshot || this.term.getSelection();
+  }
+
+  onCopyCapture = (e: ClipboardEvent) => {
+    if (this.selectionSnapshot && e.clipboardData) {
+      e.clipboardData.setData('text/plain', this.selectionSnapshot);
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
   onMouseUp = (e: React.MouseEvent) => {
     if (this.props.quickEdit && e.button === 2) {
       if (this.term.hasSelection()) {
-        clipboard.writeText(this.term.getSelection());
+        clipboard.writeText(this.getSelectionText());
         this.term.clearSelection();
       } else {
         document.execCommand('paste');
       }
     } else if (this.props.copyOnSelect && this.term.hasSelection()) {
-      clipboard.writeText(this.term.getSelection());
+      clipboard.writeText(this.getSelectionText());
     }
   };
 
@@ -519,6 +547,7 @@ export default class Term extends React.PureComponent<
 
   componentWillUnmount() {
     terms[this.props.uid] = null;
+    this.termRef?.removeEventListener('copy', this.onCopyCapture, {capture: true});
     this.termWrapperRef?.removeChild(this.termRef!);
     this.props.ref_(this.props.uid, null);
 

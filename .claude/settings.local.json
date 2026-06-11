@@ -26,7 +26,9 @@
       "Bash(ls *)",
       "Bash(node -e 'const fs=require\\('\\\\''fs'\\\\''\\);const p='\\\\''__TRACKED_VAR__'\\\\'';const j=JSON.parse\\(fs.readFileSync\\(p,'\\\\''utf8'\\\\''\\)\\);const {fontFamily,fontSize,...rest}=j;const o={fontFamily:'\\\\''\"Cascadia Code\", Menlo, monospace'\\\\'',fontSize:14,...rest};fs.writeFileSync\\(p,JSON.stringify\\(o,null,2\\)+'\\\\''\\\\n'\\\\''\\);')",
       "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\('\\\\n'.join\\(d.get\\('dependencies',{}\\).keys\\(\\)\\)\\)\")",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(yarn outdated *)",
+      "Bash(yarn audit *)"
     ]
   }
 }
