@@ -1,0 +1,15 @@
+[package]
+name = "hyper-term"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+alacritty_terminal.workspace = true
+
+crossbeam-channel.workspace = true
+log.workspace = true
+sys-locale.workspace = true
+tempfile.workspace = true
+regex.workspace = true
+dirs.workspace = true

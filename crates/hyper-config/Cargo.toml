@@ -1,0 +1,18 @@
+[package]
+name = "hyper-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+notify.workspace = true
+notify-debouncer-full.workspace = true
+csscolorparser.workspace = true
+crossbeam-channel.workspace = true
+indexmap.workspace = true
+log.workspace = true
+regex.workspace = true
+dirs.workspace = true
+tempfile.workspace = true

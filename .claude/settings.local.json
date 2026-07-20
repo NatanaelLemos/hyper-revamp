@@ -1,34 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep:*)",
-      "Bash(xargs ls:*)",
-      "WebSearch",
-      "WebFetch(domain:github.com)",
+      "Bash(./bundle/bundle-mac.sh)",
+      "Bash(sed 's|dist/hyper-revamp.app/||')",
+      "Bash(codesign -dv dist/hyper-revamp.app)",
+      "Bash(./dist/hyper-revamp.app/Contents/MacOS/hyper-revamp --version)",
+      "Bash(git check-ignore *)",
+      "Bash(git status *)",
+      "Bash(xargs -I{} du -k \"{}\")",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:hyper.is)",
-      "Bash(mkdir -p /tmp/rimraf-test/sub)",
-      "Bash(touch /tmp/rimraf-test/sub/file.txt)",
-      "Bash(node ./bin/rimraf-standalone.js /tmp/rimraf-test)",
-      "Read(//tmp/**)",
-      "Bash(wc -l /Users/natelemos/Downloads/cwr/repo/hyper/app/menus/menus/*.ts)",
-      "Bash(yarn run:*)",
-      "Bash(ls tsconfig*.json)",
-      "Bash(npx typescript-json-schema:*)",
-      "Bash(yarn tsc:*)",
-      "Bash(ls webpack*)",
-      "Bash(cat ava.config.*)",
-      "Bash(yarn test:unit)",
-      "Bash(yarn lint:*)",
-      "Bash(npx tsc *)",
-      "Bash(npx vitest *)",
-      "Bash(npx ava *)",
-      "Bash(ls *)",
-      "Bash(node -e 'const fs=require\\('\\\\''fs'\\\\''\\);const p='\\\\''__TRACKED_VAR__'\\\\'';const j=JSON.parse\\(fs.readFileSync\\(p,'\\\\''utf8'\\\\''\\)\\);const {fontFamily,fontSize,...rest}=j;const o={fontFamily:'\\\\''\"Cascadia Code\", Menlo, monospace'\\\\'',fontSize:14,...rest};fs.writeFileSync\\(p,JSON.stringify\\(o,null,2\\)+'\\\\''\\\\n'\\\\''\\);')",
-      "Bash(python3 -c \"import json,sys;d=json.load\\(sys.stdin\\);print\\('\\\\n'.join\\(d.get\\('dependencies',{}\\).keys\\(\\)\\)\\)\")",
-      "Bash(npm install *)",
-      "Bash(yarn outdated *)",
-      "Bash(yarn audit *)"
+      "Bash(git ls-remote *)",
+      "Bash(awk '{print $1}')",
+      "Bash(grep -E 'refs/heads/\\(main|master|canary\\)$')",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(git checkout *)",
+      "Bash(git add *)"
     ]
   }
 }

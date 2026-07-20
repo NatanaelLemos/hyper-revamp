@@ -1,116 +1,214 @@
-![](https://assets.vercel.com/image/upload/v1549723846/repositories/hyper/hyper-3-repo-banner.png)
+# hyper-revamp
 
-<p align="center">
-  <a aria-label="Vercel logo" href="https://vercel.com">
-    <img src="https://img.shields.io/badge/MADE%20BY%20Vercel-000000.svg?style=for-the-badge&logo=vercel&labelColor=000000&logoWidth=20">
-  </a>
- </p>
-  
-[![Node CI](https://github.com/vercel/hyper/workflows/Node%20CI/badge.svg?event=push)](https://github.com/vercel/hyper/actions?query=workflow%3A%22Node+CI%22+branch%3Acanary+event%3Apush)
-[![Changelog #213](https://img.shields.io/badge/changelog-%23213-lightgrey.svg)](https://changelog.com/213)
+**A Rust re-implementation of [Hyper](https://github.com/vercel/hyper).**
 
-For more details, head to: https://hyper.is
+Hyper is a terminal built on Electron and web standards. `hyper-revamp` keeps
+the configuration, themes, and behavior, and replaces the runtime: no Electron,
+no Chromium, no webview — a native binary rendering on the GPU.
+
+It is a drop-in replacement for the Electron build. It reads and writes the same
+config file (`~/.config/hyper-revamp/hyper-revamp.json`, `$XDG_CONFIG_HOME`
+honored), the same `themes/` directory, and the same `session-state.json`, so
+you can switch between the two without migrating anything.
+
+```
+vercel/hyper  →  hyper-revamp (Electron fork)  →  hyper-revamp (this repo, native Rust)
+```
 
 ## Project goals
 
-The goal of the project is to create a beautiful and extensible experience for command-line interface users, built on open web standards. In the beginning, our focus will be primarily around speed, stability and the development of the correct API for extension authors.
+Hyper's stated goal is "a beautiful and extensible experience for command-line
+interface users, built on open web standards." This project keeps the first half
+and trades the second: the web stack is what costs Hyper its startup time,
+memory, and input latency, so it's gone.
 
-In the future, we anticipate the community will come up with innovative additions to enhance what could be the simplest, most powerful and well-tested interface for productivity.
+- **Native and fast** — a single binary, GPU-rendered, no browser engine
+- **Config-compatible** — same file formats, same keys, same semantics
+- **Faithful** — match the Electron build's behavior everywhere it's worth
+  matching, and document every place it deliberately doesn't
+
+The extension API is the explicit casualty. Hyper plugins are npm packages that
+inject JavaScript and CSS into a renderer process; there is no renderer here, so
+there are no plugins.
+
+### Stack
+
+- **[egui](https://github.com/emilk/egui)/eframe (wgpu)** — GPU-rendered UI
+- **[alacritty_terminal](https://crates.io/crates/alacritty_terminal)** — VT
+  emulation, PTY handling, and the reader/writer event loop
+- Bundled Cascadia Code (regular/bold/italic/bold-italic)
 
 ## Usage
 
-[Download the latest release!](https://hyper.is/#installation)
-
-### Linux
-#### Arch and derivatives
-Hyper is available in the [AUR](https://aur.archlinux.org/packages/hyper/). Use an AUR [package manager](https://wiki.archlinux.org/index.php/AUR_helpers) e.g. [paru](https://github.com/Morganamilo/paru)
-
-```sh
-paru -S hyper
-```
-
-#### NixOS
-Hyper is available as [Nix package](https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/misc/hyper/default.nix), to install the app run this command:
-
-```sh
-nix-env -i hyper
-```
+There are no package-manager releases yet — no Homebrew cask, no Chocolatey
+package, no AUR entry. Build from source with a stable Rust toolchain
+([rustup](https://rustup.rs)).
 
 ### macOS
 
-Use [Homebrew Cask](https://brew.sh) to download the app by running these commands:
-
-```bash
-brew update
-brew install --cask hyper
+```sh
+./bundle/bundle-mac.sh            # release .app at dist/hyper-revamp.app
 ```
+
+This builds `--release`, assembles the bundle, generates the icon, writes
+`Info.plist`, and ad-hoc codesigns. Set `TARGET_TRIPLE` to cross-compile
+(defaults to `aarch64-apple-darwin`).
+
+The result is ad-hoc signed, which is fine on the machine that built it.
+Gatekeeper will block it elsewhere — distributing it needs a Developer ID
+signature and notarization.
+
+Optionally install the CLI:
+
+```sh
+ln -sf "$PWD/dist/hyper-revamp.app/Contents/MacOS/hyper-revamp" /usr/local/bin/hyper-revamp
+```
+
+### Linux
+
+```sh
+cargo build --release -p hyper-app     # binary at target/release/hyper-revamp
+```
+
+Wayland and X11 are both enabled. There is no packaging script — install the
+binary wherever you like.
 
 ### Windows
 
-Use [chocolatey](https://chocolatey.org/) to install the app by running the following command (package information can be found [here](https://chocolatey.org/packages/hyper/)):
+The config layer resolves Windows paths, but there is no bundling script and the
+platform is not regularly exercised. `cargo build --release -p hyper-app` is the
+whole story.
 
-```bash
-choco install hyper
+### Command line
+
+```sh
+hyper-revamp [paths…]
 ```
 
-**Note:** The version available on [Homebrew Cask](https://brew.sh), [Chocolatey](https://chocolatey.org), [Snapcraft](https://snapcraft.io/store) or the [AUR](https://aur.archlinux.org) may not be the latest. Please consider downloading it from [here](https://hyper.is/#installation) if that's the case.
+Opens a tab per path — a directory opens a tab in it, an executable file runs,
+any other file is typed at the prompt (the `openFile` rules) — and a path that
+doesn't exist is an error. A second invocation hands off to the running instance
+over a unix socket. `--version` prints the version.
+
+## Feature parity
+
+Carried over from the Electron build:
+
+- Profiles (local + SSH with publickey/password auth), per-profile themes and
+  tab accent colors, profile-aware `preserveCWD`
+- 12 bundled themes + user themes (`themes/*.json`, `*.css` with `--hyper-*`
+  custom properties), live hot reload on config/theme file changes
+- Tabs and splits with the same split/rebalance semantics as `term-groups.ts`,
+  drag-resizable separators, ⌘1–9 tab jumps
+- Full keymap support (`keymaps` section, mousetrap strings), native macOS menus
+  whose accelerators follow the keymap
+- Selection-snapshot clipboard behavior, copyOnSelect, quickEdit, bracketed
+  paste, mouse reporting (SGR + legacy), scrollback, search (⌘F), URL detection
+  (regex + OSC 8) with scheme allowlist
+- Settings window (⌘,): visual editors for profiles/themes/terminal/env/keymaps
+  plus a raw JSON editor. Edits apply to your own document, never the
+  defaults-merged view, so unknown keys (`plugins`, `$schema`, `css`, …) survive
+  and defaults are never baked in; each key your file sets has a reset control
+  that removes it again
+- Command palette: type `/` at the start of a prompt line (`/profile <name>`)
+- Session restore (`restoreSession: true`) and window geometry persistence, in
+  the same file formats as the Electron build
+- ssh:// URL handler (opens a tab and types the ssh command), shell fallback
+  warning when a custom shell dies on startup, bell (sound + visual flash),
+  focus/blur window opacity
+
+### Deliberate deferrals
+
+Ligatures, sixel/iTerm2 images, screen-reader mode, auto-update, news
+notifications, the win/linux hamburger menu, and CSS injection (`css` /
+`termCSS` are preserved in the file but have no effect natively). The plugin
+system is dropped entirely.
+
+### Deliberate behavior differences
+
+Everywhere else the goal is to match the Electron build exactly. These are the
+places it knowingly doesn't:
+
+- **`command`/`cmd`/`meta` bindings don't fire off macOS.** egui has no Super
+  modifier, so there is nothing to bind them to. Mapping them onto Ctrl instead
+  would swallow Ctrl+C, so they simply don't fire — much as they wouldn't
+  without a Super press upstream. The default linux/win32 keymaps use `ctrl+`,
+  so nothing shipped is affected.
+- **`editor:deleteEndLine` sends `\x0b` (VT), not `\x10B`.** Upstream's value is
+  a typo — `\x10` is DLE followed by a literal `B` — that no shell acts on.
+  `\x0b` is the kill-to-end-of-line every readline and zle binding expects.
+- **Pasted control characters are stripped**, except tab and newline (`\r\n` and
+  `\n` normalize to `\r`, so multi-line pastes still run as they do in any
+  terminal). Upstream forwards the rest as-is, which lets a paste smuggle escape
+  sequences into the shell.
+- **Mouse mode 1005 (UTF-8 coordinates) is honored.** xterm.js dropped it, so
+  the Electron build never spoke it — but `alacritty_terminal` sets the mode
+  whenever an app asks, and replying to a UTF-8 request with X10 bytes is worse
+  than answering it properly.
+- **The window position is validated a frame late.** Electron checked the saved
+  position against the display list before opening the window; winit only
+  exposes displays once the event loop is running, so a window restored onto an
+  unplugged monitor is placed and then recentered rather than never placed
+  wrong.
 
 ## Contribute
 
-Regardless of the platform you are working on, you will need to have Yarn installed. If you have never installed Yarn before, you can find out how at: https://yarnpkg.com/en/docs/install.
+Regardless of platform, you will need a stable Rust toolchain via
+[rustup](https://rustup.rs). Then:
 
-1. Install necessary packages:
-  * Windows
-    - Be sure to run  `yarn global add windows-build-tools` from an elevated prompt (as an administrator) to install `windows-build-tools`.
-  * macOS
-    - Once you have installed Yarn, you can skip this section!
-  * Linux (You can see [here](https://en.wikipedia.org/wiki/List_of_Linux_distributions) what your Linux is based on.)
-    - RPM-based
-        + `GraphicsMagick`
-        + `libicns-utils`
-        + `xz` (Installed by default on some distributions.)
-    - Debian-based
-        + `graphicsmagick`
-        + `icnsutils`
-        + `xz-utils`
-2. [Fork](https://help.github.com/articles/fork-a-repo/) this repository to your own GitHub account and then [clone](https://help.github.com/articles/cloning-a-repository/) it to your local device
-3. Install the dependencies: `yarn`
-4. Build the code and watch for changes: `yarn run dev`
-5. To run `hyper`
-  * `yarn run app` from another terminal tab/window/pane
-  * If you are using **Visual Studio Code**, select `Launch Hyper` in debugger configuration to launch a new Hyper instance with debugger attached.
-  * If you interrupt `yarn run dev`, you'll need to relaunch it each time you want to test something. Webpack will watch changes and will rebuild renderer code when needed (and only what have changed). You'll just have to relaunch electron by using yarn run app or VSCode launch task.
-
-To make sure that your code works in the finished application, you can generate the binaries like this:
-
-```bash
-yarn run dist
+```sh
+cargo run -p hyper-app            # debug build, runs the app
+cargo test                        # workspace tests
+cargo clippy --all-targets        # lints
+cargo fmt                         # formatting
 ```
 
-After that, you will see the binary in the `./dist` folder!
+### Workspace layout
+
+```
+crates/
+├── hyper-term      # engine: sessions, PTY, ssh, cwd, env (no GUI deps)
+├── hyper-config    # config model, themes, keymaps, hot reload
+└── hyper-app       # the eframe app (binary name: hyper-revamp)
+assets/             # themes, keymaps, schema, fonts, icon — all include_str!'d
+bundle/             # bundle-mac.sh
+```
+
+Everything under `assets/` is compiled into the binary with `include_str!` /
+`include_bytes!`, so adding a bundled theme or keymap means editing both the
+file and the table that embeds it (`theme.rs`, `keymap.rs`).
 
 #### Known issues that can happen during development
 
-##### Error building `node-pty`
+##### `warning: couldn't generate hyper-revamp.icns`
 
-If after building during development you get an alert dialog related to `node-pty` issues,
-make sure its build process is working correctly by running `yarn run rebuild-node-pty`.
+`bundle-mac.sh` shells out to ImageMagick to build the iconset. Without it the
+bundle still builds, just with no icon. Install it with `brew install
+imagemagick`.
 
-If you are on macOS, this typically is related to Xcode issues (like not having agreed
-to the Terms of Service by running `sudo xcodebuild` after a fresh Xcode installation).
+##### The built `.app` won't open on another Mac
 
-##### Error with `C++` on macOS when running `yarn`
+The bundle is ad-hoc signed (`codesign --sign -`). Gatekeeper only trusts that
+on the machine that produced it. Real distribution needs a Developer ID
+certificate and notarization.
 
-If you are getting compiler errors when running `yarn` add the environment variable `export CXX=clang++`
+##### First release build is slow
 
-##### Error with `codesign` on macOS when running `yarn run dist`
-
-If you have issues in the `codesign` step when running `yarn run dist` on macOS, you can temporarily disable code signing locally by setting
-`export CSC_IDENTITY_AUTO_DISCOVERY=false` for the current terminal session.
+`wgpu` and `eframe` are a large dependency tree; a cold `--release` build takes a
+few minutes. Incremental rebuilds are fast. `[profile.dev]` uses `opt-level = 1`
+(and `2` for dependencies) so debug builds are usable at speed.
 
 ## Related Repositories
 
-- [Website](https://github.com/vercel/hyper-site)
-- [Sample Extension](https://github.com/vercel/hyperpower)
-- [Sample Theme](https://github.com/vercel/hyperyellow)
-- [Awesome Hyper](https://github.com/bnb/awesome-hyper)
+- [vercel/hyper](https://github.com/vercel/hyper) — the original, which this
+  re-implements
+- [alacritty/alacritty](https://github.com/alacritty/alacritty) — source of
+  `alacritty_terminal`, the VT emulation core
+- [emilk/egui](https://github.com/emilk/egui) — the immediate-mode GUI library
+- [Awesome Hyper](https://github.com/bnb/awesome-hyper) — themes and plugins for
+  upstream Hyper. Themes are portable here; plugins are not.
+
+## License
+
+MIT, as declared in the workspace `Cargo.toml` and inherited from upstream
+Hyper.

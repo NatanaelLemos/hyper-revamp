@@ -1,23 +1,19 @@
-# build output
-dist
-app/renderer
-target
-bin/cli.*
-cache
+# Rust / Cargo build output
+/target
+**/*.rs.bk
+*.pdb
 
-# dependencies
-node_modules
+# bundled app output
+/dist
 
-# logs
-npm-debug.log
-yarn-error.log
+# local dev config (repo root only — assets/schema.json is a real source file)
+/hyper.json
+/schema.json
 
-# optional dev config file and plugins directory
-hyper.json
-schema.json
-plugins
-
+# macOS
 .DS_Store
+
+# editors
+.idea
 .vscode/*
 !.vscode/launch.json
-.idea

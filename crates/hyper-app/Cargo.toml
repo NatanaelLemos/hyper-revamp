@@ -1,0 +1,47 @@
+[package]
+name = "hyper-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "hyper-revamp"
+path = "src/main.rs"
+
+[dependencies]
+hyper-term = { path = "../hyper-term" }
+hyper-config = { path = "../hyper-config" }
+alacritty_terminal.workspace = true
+eframe.workspace = true
+egui.workspace = true
+arboard.workspace = true
+crossbeam-channel.workspace = true
+slotmap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+open.workspace = true
+lru.workspace = true
+log.workspace = true
+env_logger.workspace = true
+regex.workspace = true
+tempfile.workspace = true
+dirs.workspace = true
+rfd.workspace = true
+notify-rust.workspace = true
+muda.workspace = true
+# Only for the event loop main.rs hands to `eframe::create_native`, so the
+# monitor list can be read before the window is placed. No features of its
+# own: the backends come from eframe's own winit dependency.
+winit = { version = "0.30", default-features = false }
+
+[dev-dependencies]
+egui_kittest = { version = "0.35", features = ["eframe"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSAppleEventManager", "NSAppleEventDescriptor", "NSString", "objc2-core-services"] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWindow", "NSResponder", "NSGraphics"] }
+# LaunchServices, for registering as the ssh:// handler (`defaultSSHApp`).
+objc2-core-services = { version = "0.3", features = ["LSInfo", "LaunchServices"] }
+objc2-core-foundation = { version = "0.3", features = ["CFBase", "CFString"] }
