@@ -6,6 +6,8 @@ Hyper is a terminal built on Electron and web standards. `hyper-revamp` keeps
 the configuration, themes, and behavior, and replaces the runtime: no Electron,
 no Chromium, no webview — a native binary rendering on the GPU.
 
+Read the story behind the rewrite and its benchmarks: [A single prompt brought my favorite terminal back from the dead](https://nate.lemos.dev/blog/a-single-prompt-brought-my-favorite-terminal-back-from-the-dead).
+
 It is a drop-in replacement for the Electron build. It reads and writes the same
 config file (`~/.config/hyper-revamp/hyper-revamp.json`, `$XDG_CONFIG_HOME`
 honored), the same `themes/` directory, and the same `session-state.json`, so
